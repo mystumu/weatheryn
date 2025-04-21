@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeatheRyn</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <style>
+      @import url(https://fonts.googleapis.com/css2?family=Lato&display=swap);
+@import url(https://fonts.googleapis.com/css2?family=Open+Sans&display=swap);
+@import url(https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200);
+
+      /* Estilos personalizados para el autocompletado */
+      .suggestion-active {
+        background-color: rgba(99, 102, 241, 0.1);
+      }
+      
+      /* Animaciones personalizadas */
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      
+      @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+      }
+      
+      /* Estilo para el indicador de carga */
+      .loading-spinner {
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      /* Estilos para el tema oscuro */
+      [data-theme="dark"] {
+        --bg-primary: #1a1a1a;
+        --text-primary: #ffffff;
+        --card-bg: #2d2d2d;
+        --border-color: #404040;
+      }
+
+      /* Estilos para el switch de tema */
+      .theme-switch {
+        position: relative;
+        width: 60px;
+        height: 30px;
+        border-radius: 15px;
+        background: #4f46e5;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+
+      .theme-switch::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: white;
+        transition: transform 0.3s;
+      }
+
+      .theme-switch[data-active="true"]::after {
+        transform: translateX(30px);
+      }
+
+      /* Estilos para el selector de unidades */
+      .unit-switch {
+        display: inline-flex;
+        background: #4f46e5;
+        border-radius: 8px;
+        padding: 2px;
+      }
+
+      .unit-switch button {
+        padding: 4px 8px;
+        border-radius: 6px;
+        border: none;
+        background: transparent;
+        color: white;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+
+      .unit-switch button.active {
+        background: white;
+        color: #4f46e5;
+      }
+
+      /* Estilos para el mapa */
+      #map {
+        height: 100%;
+        width: 100%;
+        border-radius: 0.5rem;
+      }
+
+      .map-container {
+        height: 300px;
+        position: relative;
+      }
+
+      .map-controls {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        z-index: 1000;
+        display: flex;
+        gap: 8px;
+      }
+
+      .map-controls button {
+        background: white;
+        border: none;
+        border-radius: 4px;
+        padding: 6px 12px;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .map-controls button:hover {
+        background: #f0f0f0;
+      }
+    </style>
+  </head>
+  <body>
+<div id="webcrumbs"><div class="bg-gradient-to-b from-indigo-100 to-blue-200 min-h-screen p-4 font-sans" data-theme="light"> <div class="max-w-4xl mx-auto"> <header class="mb-8"> 
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center">
+            <img src="https://i.ibb.co/YF2SGvfv/weatheryn.png" alt="WeatheRyn Logo" class="h-12 w-12 mr-3">
+            <h1 class="text-3xl font-bold text-gray-800">WeatheRyn</h1>
+        </div>
+        <div class="flex items-center space-x-3">
+            <div class="language-selector">
+                <select id="language-select" class="bg-white text-gray-800 px-2 py-1 rounded-md border border-gray-300 cursor-pointer text-sm">
+                    <option value="es" selected>Español</option>
+                    <option value="en">English</option>
+                    <option value="fr">Français</option>
+                    <option value="pt">Português</option>
+                    <option value="de">Deutsch</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="flex items-center justify-between"> <div class="relative w-full max-w-md"> <input type="text" placeholder="Buscar una ubicación..." class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent shadow-sm transition-all duration-300"/> <span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-500">search</span> </div> <button class="ml-4 bg-primary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-primary-600 transition-all duration-300 flex items-center"> <span class="material-symbols-outlined mr-1">my_location</span> Ubicación actual </button> </div> </header>  <main> <div class="bg-gradient-to-r from-amber-400 to-orange-500 rounded-xl p-6 shadow-lg mb-8 transform hover:scale-[1.01] transition-all duration-300"> <div class="flex flex-col md:flex-row items-center justify-between"> <div> <h2 class="text-white text-2xl font-bold mb-2">San Francisco, CA</h2> <p class="text-white/90 text-lg">Tuesday, October 10</p> <div class="flex items-center mt-4"> <span class="text-6xl font-bold text-white">22°</span> <div class="ml-4"> <p class="text-white/90">Feels like 24°</p> <p class="text-white font-medium">Sunny</p> </div> </div> </div> <div class="mt-6 md:mt-0"> <svg class="w-32 h-32 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"> <circle cx="12" cy="12" r="5"></circle> <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path> </svg> </div> </div> <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 text-white/90"> <div class="flex items-center"> <span class="material-symbols-outlined mr-2">air</span> <span data-wind>Wind: 5 mph</span> </div> <div class="flex items-center"> <span class="material-symbols-outlined mr-2">water_drop</span> <span data-humidity>Humidity: 45%</span> </div> <div class="flex items-center"> <span class="material-symbols-outlined mr-2">visibility</span> <span>Visibility: 10 mi</span> </div> <div class="flex items-center"> <span class="material-symbols-outlined mr-2">compress</span> <span data-pressure>Pressure: 1015 hPa</span> </div> </div> </div>  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8"> <div class="bg-white rounded-xl p-5 shadow-md hover:shadow-lg transition-shadow duration-300"> <h3 class="font-bold text-lg text-gray-800 mb-3">Pronóstico por hora</h3> <div class="flex overflow-x-auto pb-2 space-x-6"> <div class="flex flex-col items-center min-w-[60px]"> <span class="text-gray-600">Ahora</span> <span class="material-symbols-outlined my-2 text-amber-500">wb_sunny</span> <span class="font-bold">22°</span> </div> <div class="flex flex-col items-center min-w-[60px]"> <span class="text-gray-600">14:00</span> <span class="material-symbols-outlined my-2 text-amber-500">wb_sunny</span> <span class="font-bold">23°</span> </div> <div class="flex flex-col items-center min-w-[60px]"> <span class="text-gray-600">15:00</span> <span class="material-symbols-outlined my-2 text-amber-500">wb_sunny</span> <span class="font-bold">24°</span> </div> <div class="flex flex-col items-center min-w-[60px]"> <span class="text-gray-600">16:00</span> <span class="material-symbols-outlined my-2 text-amber-500">wb_sunny</span> <span class="font-bold">23°</span> </div> <div class="flex flex-col items-center min-w-[60px]"> <span class="text-gray-600">17:00</span> <span class="material-symbols-outlined my-2 text-amber-400">wb_twilight</span> <span class="font-bold">21°</span> </div> </div> </div>  <div class="bg-white rounded-xl p-5 shadow-md hover:shadow-lg transition-shadow duration-300"> <h3 class="font-bold text-lg text-gray-800 mb-3">Calidad del aire</h3> <div class="flex items-center mb-3"> <div class="h-2 flex-1 bg-gray-200 rounded-full overflow-hidden"> <div class="h-full w-1/4 bg-green-500 rounded-full"></div> </div> <span class="ml-3 font-bold text-green-500">Buena</span> </div> <p class="text-gray-600 text-sm">La calidad del aire es considerada satisfactoria y la contaminación del aire presenta poco o ningún riesgo.</p> </div>  <div class="bg-white rounded-xl p-5 shadow-md hover:shadow-lg transition-shadow duration-300"> <h3 class="font-bold text-lg text-gray-800 mb-3">Amanecer y Atardecer</h3> <div class="flex justify-between mb-4"> <div class="flex items-center"> <span class="material-symbols-outlined text-amber-500 mr-2">wb_sunny</span> <div> <p class="text-gray-600 text-sm">Amanecer</p> <p class="font-bold" id="sunrise-time">6:45</p> </div> </div> <div class="flex items-center"> <span class="material-symbols-outlined text-purple-500 mr-2">wb_twilight</span> <div> <p class="text-gray-600 text-sm">Atardecer</p> <p class="font-bold" id="sunset-time">18:32</p> </div> </div> </div> <div class="h-2 bg-gray-200 rounded-full relative mb-2"> <div class="absolute top-0 left-0 right-0 h-full sun-progress-bar"> <div class="h-full w-[70%] bg-gradient-to-r from-amber-300 via-blue-400 to-purple-500 rounded-full"></div> </div> <div class="h-3 w-3 bg-white border-2 border-blue-500 rounded-full absolute top-[-2px] left-[70%] transform -translate-x-1/2 sun-icon"></div> </div> <p class="text-sm text-gray-600 text-center">11 horas 47 minutos de luz solar</p> </div> </div> <div class="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow duration-300 mb-8"> <h3 class="font-bold text-xl text-gray-800 mb-4">Pronóstico de 7 días</h3> <div class="grid gap-4"> <div class="grid grid-cols-7 gap-2 font-medium text-sm text-gray-500 mb-2 border-b border-gray-100 pb-2"> <div>Hoy</div> <div>Miér</div> <div>Jue</div> <div>Vie</div> <div>Sáb</div> <div>Dom</div> <div>Lun</div> </div> <div class="grid grid-cols-7 gap-2 text-center"> <div class="bg-gradient-to-b from-amber-100 to-amber-200 p-3 rounded-lg transform hover:scale-105 transition-all"> <span class="material-symbols-outlined text-amber-500">wb_sunny</span> <p class="font-bold mt-1">22°</p> <p class="text-gray-600 text-xs">17°</p> </div> <div class="bg-gradient-to-b from-amber-100 to-amber-200 p-3 rounded-lg transform hover:scale-105 transition-all"> <span class="material-symbols-outlined text-amber-500">wb_sunny</span> <p class="font-bold mt-1">23°</p> <p class="text-gray-600 text-xs">18°</p> </div> <div class="bg-gradient-to-b from-blue-100 to-blue-200 p-3 rounded-lg transform hover:scale-105 transition-all"> <span class="material-symbols-outlined text-blue-500">cloud</span> <p class="font-bold mt-1">21°</p> <p class="text-gray-600 text-xs">16°</p> </div> <div class="bg-gradient-to-b from-gray-100 to-gray-200 p-3 rounded-lg transform hover:scale-105 transition-all"> <span class="material-symbols-outlined text-gray-500">cloudy</span> <p class="font-bold mt-1">20°</p> <p class="text-gray-600 text-xs">14°</p> </div> <div class="bg-gradient-to-b from-blue-100 to-indigo-200 p-3 rounded-lg transform hover:scale-105 transition-all"> <span class="material-symbols-outlined text-indigo-500">rainy</span> <p class="font-bold mt-1">18°</p> <p class="text-gray-600 text-xs">13°</p> </div> <div class="bg-gradient-to-b from-gray-100 to-gray-200 p-3 rounded-lg transform hover:scale-105 transition-all"> <span class="material-symbols-outlined text-gray-500">cloudy</span> <p class="font-bold mt-1">21°</p> <p class="text-gray-600 text-xs">14°</p> </div> <div class="bg-gradient-to-b from-amber-100 to-amber-200 p-3 rounded-lg transform hover:scale-105 transition-all"> <span class="material-symbols-outlined text-amber-500">wb_sunny</span> <p class="font-bold mt-1">22°</p> <p class="text-gray-600 text-xs">17°</p> </div> </div> </div> </div>  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"> <div class="bg-gradient-to-br from-purple-100 to-indigo-200 rounded-xl p-5 shadow-md hover:shadow-lg transition-shadow duration-300"> <h3 class="font-bold text-lg text-gray-800 mb-3">Radar Meteorológico</h3> <div class="map-container"> <div id="map"></div> <div class="map-controls"> <button id="animate-map" class="bg-indigo-500 text-white px-3 py-1 rounded-lg shadow-sm hover:bg-indigo-600 transition-colors duration-300 text-sm flex items-center"> <span class="material-symbols-outlined text-sm">play_arrow</span> Animación </button> <button id="fullscreen-map" class="bg-white text-indigo-600 px-3 py-1 rounded-lg shadow-sm hover:bg-gray-50 transition-colors duration-300 text-sm flex items-center"> <span class="material-symbols-outlined text-sm">fullscreen</span> Pantalla completa </button> </div> </div> </div>  <div class="bg-white rounded-xl p-5 shadow-md hover:shadow-lg transition-shadow duration-300"> <h3 class="font-bold text-lg text-gray-800 mb-3">Noticias del tiempo</h3> <div class="space-y-4"> <div class="flex items-start border-b border-gray-100 pb-3"> <div class="bg-blue-100 rounded w-16 h-16 flex-shrink-0 flex items-center justify-center"> <span class="material-symbols-outlined text-blue-500 text-2xl">water</span> </div> <div class="ml-3"> <h4 class="font-medium text-gray-800">Mejoran las condiciones de sequía en California</h4> <p class="text-gray-600 text-sm mt-1">Las recientes lluvias han ayudado a aliviar las condiciones de sequía...</p> </div> </div> <div class="flex items-start"> <div class="bg-amber-100 rounded w-16 h-16 flex-shrink-0 flex items-center justify-center"> <span class="material-symbols-outlined text-amber-500 text-2xl">thermostat</span> </div> <div class="ml-3"> <h4 class="font-medium text-gray-800">Se espera ola de calor la próxima semana</h4> <p class="text-gray-600 text-sm mt-1">Se prevé que las temperaturas aumenten por encima de lo normal...</p> </div> </div> </div> </div>  </div> </main> <footer class="mt-8 text-center text-gray-600 text-sm py-4 border-t border-gray-200"> <p>Datos meteorológicos proporcionados por OpenWeather • Última actualización: 10 de octubre de 2023 13:45</p> <div class="flex justify-center mt-3 space-x-6"> <a href="#" class="text-gray-600 hover:text-primary-500 transition-colors duration-300">Términos</a> <a href="#" class="text-gray-600 hover:text-primary-500 transition-colors duration-300">Privacidad</a> <a href="#" class="text-gray-600 hover:text-primary-500 transition-colors duration-300">Ayuda</a> <a href="#" class="text-gray-600 hover:text-primary-500 transition-colors duration-300">Contacto</a> </div> </footer>  </div> </div></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+      tailwind.config = {
+        content: ["./src/**/*.{html,js}"],
+        theme: {"name":"Bluewave","fontFamily":{"sans":["Open Sans","ui-sans-serif","system-ui","sans-serif","\"Apple Color Emoji\"","\"Segoe UI Emoji\"","\"Segoe UI Symbol\"","\"Noto Color Emoji\""]},"extend":{"fontFamily":{"title":["Lato","ui-sans-serif","system-ui","sans-serif","\"Apple Color Emoji\"","\"Segoe UI Emoji\"","\"Segoe UI Symbol\"","\"Noto Color Emoji\""],"body":["Open Sans","ui-sans-serif","system-ui","sans-serif","\"Apple Color Emoji\"","\"Segoe UI Emoji\"","\"Segoe UI Symbol\"","\"Noto Color Emoji\""]},"colors":{"neutral":{"50":"#f7f7f7","100":"#eeeeee","200":"#e0e0e0","300":"#cacaca","400":"#b1b1b1","500":"#999999","600":"#7f7f7f","700":"#676767","800":"#545454","900":"#464646","950":"#282828"},"primary":{"50":"#f3f1ff","100":"#e9e5ff","200":"#d5cfff","300":"#b7a9ff","400":"#9478ff","500":"#7341ff","600":"#631bff","700":"#611bf8","800":"#4607d0","900":"#3c08aa","950":"#220174","DEFAULT":"#611bf8"}}},"fontSize":{"xs":["12px",{"lineHeight":"19.200000000000003px"}],"sm":["14px",{"lineHeight":"21px"}],"base":["16px",{"lineHeight":"25.6px"}],"lg":["18px",{"lineHeight":"27px"}],"xl":["20px",{"lineHeight":"28px"}],"2xl":["24px",{"lineHeight":"31.200000000000003px"}],"3xl":["30px",{"lineHeight":"36px"}],"4xl":["36px",{"lineHeight":"41.4px"}],"5xl":["48px",{"lineHeight":"52.800000000000004px"}],"6xl":["60px",{"lineHeight":"66px"}],"7xl":["72px",{"lineHeight":"75.60000000000001px"}],"8xl":["96px",{"lineHeight":"100.80000000000001px"}],"9xl":["128px",{"lineHeight":"134.4px"}]},"borderRadius":{"none":"0px","sm":"6px","DEFAULT":"12px","md":"18px","lg":"24px","xl":"36px","2xl":"48px","3xl":"72px","full":"9999px"},"spacing":{"0":"0px","1":"4px","2":"8px","3":"12px","4":"16px","5":"20px","6":"24px","7":"28px","8":"32px","9":"36px","10":"40px","11":"44px","12":"48px","14":"56px","16":"64px","20":"80px","24":"96px","28":"112px","32":"128px","36":"144px","40":"160px","44":"176px","48":"192px","52":"208px","56":"224px","60":"240px","64":"256px","72":"288px","80":"320px","96":"384px","px":"1px","0.5":"2px","1.5":"6px","2.5":"10px","3.5":"14px"}},
+        plugins: [],
+        important: '#webcrumbs'
+    };
+    </script>
+
+  </body>
+</html>

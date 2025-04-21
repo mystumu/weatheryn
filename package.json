@@ -9,10 +9,9 @@
   },
   "dependencies": {
     "axios": "^1.6.7",
-    "leaflet": "^1.9.4",
     "tailwindcss": "^3.4.1"
   },
   "devDependencies": {
     "vite": "^5.1.4"
   }
-}
+} 

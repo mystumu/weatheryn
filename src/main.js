@@ -1,16 +1,8 @@
 import axios from 'axios';
-import L from 'leaflet';
 
 // Variables globales
 const API_KEY = localStorage.getItem('weatheryn_api_key') || 'b55a4a30fa067e687caeb099d2b62dd6';
 const BASE_URL = 'https://api.openweathermap.org/data/2.5';
-
-let currentWeather = null;
-let forecast = null;
-let currentLocation = null;
-let language = 'es';
-let theme = 'light';
-let unit = 'metric';
 
 // Idioma actual - valor predeterminado: español
 let currentLanguage = localStorage.getItem('weatheryn_language') || 'es';
@@ -2900,114 +2892,6 @@ function initializeAutocomplete() {
     });
 }
 
-// Clase para manejar el mapa interactivo
-class WeatherMap {
-    constructor() {
-        this.map = null;
-        this.marker = null;
-        this.animationInterval = null;
-        this.isAnimating = false;
-        this.weatherLayers = [];
-    }
-
-    init() {
-        // Inicializar el mapa
-        this.map = L.map('map').setView([37.7749, -122.4194], 10); // Vista inicial de San Francisco
-        
-        // Añadir capa base de OpenStreetMap
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(this.map);
-
-        // Añadir capa de radar meteorológico
-        this.addWeatherLayer();
-
-        // Configurar controles
-        this.setupControls();
-    }
-
-    addWeatherLayer() {
-        // Añadir capa de radar meteorológico (usando OpenWeatherMap)
-        const weatherLayer = L.tileLayer('https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=' + API_KEY, {
-            attribution: 'Weather data © OpenWeatherMap',
-            opacity: 0.7
-        }).addTo(this.map);
-        
-        this.weatherLayers.push(weatherLayer);
-    }
-
-    setupControls() {
-        // Configurar botón de animación
-        const animateBtn = document.getElementById('animate-map');
-        if (animateBtn) {
-            animateBtn.addEventListener('click', () => this.toggleAnimation());
-        }
-
-        // Configurar botón de pantalla completa
-        const fullscreenBtn = document.getElementById('fullscreen-map');
-        if (fullscreenBtn) {
-            fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
-        }
-    }
-
-    toggleAnimation() {
-        if (this.isAnimating) {
-            this.stopAnimation();
-        } else {
-            this.startAnimation();
-        }
-    }
-
-    startAnimation() {
-        this.isAnimating = true;
-        const animateBtn = document.getElementById('animate-map');
-        if (animateBtn) {
-            animateBtn.innerHTML = '<span class="material-symbols-outlined text-sm">pause</span> Pausar';
-        }
-
-        // Simular animación del radar (cambiar opacidad)
-        this.animationInterval = setInterval(() => {
-            this.weatherLayers.forEach(layer => {
-                const currentOpacity = layer.options.opacity;
-                layer.setOpacity(currentOpacity === 0.7 ? 0.3 : 0.7);
-            });
-        }, 1000);
-    }
-
-    stopAnimation() {
-        this.isAnimating = false;
-        const animateBtn = document.getElementById('animate-map');
-        if (animateBtn) {
-            animateBtn.innerHTML = '<span class="material-symbols-outlined text-sm">play_arrow</span> Animación';
-        }
-        clearInterval(this.animationInterval);
-        this.weatherLayers.forEach(layer => layer.setOpacity(0.7));
-    }
-
-    toggleFullscreen() {
-        const mapContainer = document.querySelector('.map-container');
-        if (!document.fullscreenElement) {
-            mapContainer.requestFullscreen().catch(err => {
-                console.error(`Error al intentar entrar en pantalla completa: ${err.message}`);
-            });
-        } else {
-            document.exitFullscreen();
-        }
-    }
-
-    updateLocation(lat, lon) {
-        if (this.map) {
-            this.map.setView([lat, lon], 10);
-            
-            // Actualizar marcador
-            if (this.marker) {
-                this.map.removeLayer(this.marker);
-            }
-            this.marker = L.marker([lat, lon]).addTo(this.map);
-        }
-    }
-}
-
 // Inicializar la aplicación
 function initApp() {
     // Obtener elementos del DOM
@@ -3078,42 +2962,62 @@ function initApp() {
     // Iniciar reloj
     startClock();
     
-    // Inicializar el mapa
-    const weatherMap = new WeatherMap();
-    weatherMap.init();
-
-    // Actualizar el mapa cuando se cambie la ubicación
+    // Botón de ubicación actual
     if (currentLocationBtn) {
         currentLocationBtn.addEventListener('click', async () => {
+            console.log('Obteniendo ubicación actual...');
+            
             try {
-                const position = await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject);
-                });
+                // Efecto de carga sobre el botón
+                currentLocationBtn.classList.add('opacity-75');
+                currentLocationBtn.disabled = true;
                 
-                const { latitude, longitude } = position.coords;
-                weatherMap.updateLocation(latitude, longitude);
-                
-                // Obtener datos del clima por coordenadas
-                try {
-                    const weatherData = await getWeatherByCoordinates(latitude, longitude);
-                    updateWeatherUI(weatherData);
-                    
-                    // Obtener y actualizar pronóstico
-                    const forecastData = await getForecastByCoordinates(latitude, longitude);
-                    updateHourlyForecast(forecastData);
-                    update7DayForecast(forecastData);
-                    
-                    // Actualizar el radar meteorológico
-                    updateWeatherRadar(latitude, longitude);
-                } catch (error) {
-                    console.error('Error al obtener datos del clima por coordenadas:', error);
-                }
-                
-                // Restaurar botón
+                // Solicitar geolocalización
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        const { latitude, longitude } = position.coords;
+                        console.log(`Ubicación obtenida: ${latitude}, ${longitude}`);
+                        
+                        // Obtener datos del clima por coordenadas
+                        try {
+                            const weatherData = await getWeatherByCoordinates(latitude, longitude);
+                            updateWeatherUI(weatherData);
+                            
+                            // Obtener y actualizar pronóstico
+                            const forecastData = await getForecastByCoordinates(latitude, longitude);
+                            updateHourlyForecast(forecastData);
+                            update7DayForecast(forecastData);
+                            
+                            // Actualizar el radar meteorológico
+                            updateWeatherRadar(latitude, longitude);
+                        } catch (error) {
+                            console.error('Error al obtener datos del clima por coordenadas:', error);
+                        }
+                        
+                        // Restaurar botón
+                        currentLocationBtn.classList.remove('opacity-75');
+                        currentLocationBtn.disabled = false;
+                    },
+                    (error) => {
+                        console.error('Error al obtener ubicación:', error);
+                        
+                        // Restaurar botón
+                        currentLocationBtn.classList.remove('opacity-75');
+                        currentLocationBtn.disabled = false;
+                        
+                        // Mostrar error
+                        alert('No se pudo obtener tu ubicación. Verifica que hayas dado permiso para acceder a tu ubicación.');
+                    },
+                    {
+                        enableHighAccuracy: false,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            } catch (error) {
+                console.error('Error al solicitar geolocalización:', error);
                 currentLocationBtn.classList.remove('opacity-75');
                 currentLocationBtn.disabled = false;
-            } catch (error) {
-                console.error('Error al obtener ubicación:', error);
             }
         });
     } else {

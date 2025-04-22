@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Política de Privacidad - WeatheRyn</title>
+    <link rel="icon" type="image/png" href="https://i.ibb.co/YF2SGvfv/weatheryn.png">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        content: ["./src/**/*.{html,js}"],
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                DEFAULT: '#1a73e8'
+              }
+            }
+          }
+        }
+      };
+    </script>
+  </head>
+  <body class="bg-gray-50 min-h-screen">
+    <div class="max-w-4xl mx-auto px-4 py-8">
+      <header class="mb-8">
+        <a href="index.html" class="flex items-center text-primary-600 hover:text-primary-700 transition-colors">
+          <span class="material-symbols-outlined mr-2">arrow_back</span>
+          Volver a WeatheRyn
+        </a>
+      </header>
+
+      <main class="bg-white rounded-xl shadow-md p-6">
+        <h1 class="text-3xl font-bold text-primary-600 border-b-2 border-gray-200 pb-4">Política de Privacidad - WeatheRyn</h1>
+        
+        <p class="text-gray-500 italic mb-8">Última actualización: <script>document.write(new Date().toLocaleDateString());</script></p>
+        
+        <div class="bg-gray-50 p-6 rounded-lg border-l-4 border-primary-600 mb-8">
+          <h2 class="text-xl font-semibold text-primary-600 mb-4">Resumen simple</h2>
+          <p class="text-gray-600">No recogemos ni almacenamos tus datos personales. Tu privacidad es importante para nosotros.</p>
+        </div>
+
+        <section class="mb-8">
+          <h2 class="text-xl font-semibold text-primary-600 mb-4">Lo que debes saber</h2>
+          <ul class="list-disc pl-6 space-y-3 text-gray-600">
+            <li><strong>Sin recolección de datos personales:</strong> WeatheRyn no recopila, almacena ni comparte tus datos personales.</li>
+            <li><strong>Ubicación:</strong> Si utilizas la función "Ubicación actual", tu navegador te pedirá permiso para acceder a tu ubicación geográfica. Esta información se utiliza únicamente para mostrar el clima en tu ubicación actual y no se almacena en nuestros servidores.</li>
+            <li><strong>Almacenamiento local:</strong> Utilizamos el almacenamiento local de tu dispositivo para guardar tus preferencias (como unidades de temperatura o tema de visualización) y para almacenar temporalmente datos del clima, reduciendo así las llamadas a la API. Estos datos permanecen exclusivamente en tu dispositivo.</li>
+            <li><strong>Sin análisis ni rastreo:</strong> No utilizamos cookies de rastreo, análisis de uso ni ninguna tecnología que monitorice tu actividad.</li>
+          </ul>
+        </section>
+
+        <section class="mb-8">
+          <h2 class="text-xl font-semibold text-primary-600 mb-4">Servicios de terceros</h2>
+          <p class="text-gray-600">Utilizamos la API de AccuWeather para obtener datos meteorológicos. No compartimos ninguna información tuya con AccuWeather más allá de las coordenadas geográficas necesarias para obtener el pronóstico de tu ubicación cuando utilizas esa función.</p>
+        </section>
+
+        <section class="mb-8">
+          <h2 class="text-xl font-semibold text-primary-600 mb-4">Cambios a esta política</h2>
+          <p class="text-gray-600">Si realizamos cambios a esta política de privacidad, actualizaremos la fecha de "última actualización" y te notificaremos a través de la aplicación.</p>
+        </section>
+
+        <div class="bg-gray-50 p-6 rounded-lg mt-8">
+          <h2 class="text-xl font-semibold text-primary-600 mb-4">Contacto</h2>
+          <p class="text-gray-600">Si tienes preguntas sobre esta política de privacidad, puedes contactarnos en: <a href="mailto:support@ryn-search.com" class="text-primary-600 hover:underline">support@ryn-search.com</a></p>
+        </div>
+      </main>
+
+      <footer class="mt-8 text-center text-gray-600 text-sm py-4">
+        <p>© 2025 WeatheRyn. Todos los derechos reservados.</p>
+      </footer>
+    </div>
+  </body>
+</html> 

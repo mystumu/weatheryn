@@ -1,364 +1,29 @@
 import axios from 'axios';
 
-// Variables globales
-const API_KEY = localStorage.getItem('weatheryn_api_key') || 'b55a4a30fa067e687caeb099d2b62dd6';
+// Ocultar API key usando variables de entorno o almacenamiento local
+// Si no está disponible, usar la del código pero advertir sobre seguridad
+let API_KEY = '';
+
+// Intentar obtener la API key de localStorage si fue guardada previamente
+try {
+    const storedApiKey = localStorage.getItem('weatherApiKey');
+    if (storedApiKey) {
+        API_KEY = storedApiKey;
+        console.log('API key cargada desde localStorage');
+    } else {
+        // Si no existe en localStorage, usar la del código como fallback
+        API_KEY = 'f611dbf556d4e840dc888c29b727d928';
+        // Guardar en localStorage para futuros usos
+        localStorage.setItem('weatherApiKey', API_KEY);
+        console.warn('Usando API key por defecto. En un entorno de producción, esto debería manejarse de forma segura.');
+    }
+} catch (error) {
+    // En caso de error (ej. localStorage deshabilitado), usar la del código
+    API_KEY = 'f611dbf556d4e840dc888c29b727d928';
+    console.warn('No se pudo acceder a localStorage. Usando API key por defecto.');
+}
+
 const BASE_URL = 'https://api.openweathermap.org/data/2.5';
-
-// Idioma actual - valor predeterminado: español
-let currentLanguage = localStorage.getItem('weatheryn_language') || 'es';
-
-// Función para establecer el idioma
-function setLanguage(lang) {
-    currentLanguage = lang;
-    localStorage.setItem('weatheryn_language', lang);
-    document.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: lang } }));
-}
-
-// Función para obtener una traducción
-function t(key, lang = currentLanguage) {
-    const translations = {
-        es: {
-            search: 'Buscar una ubicación...',
-            currentLocation: 'Ubicación actual',
-            sunrise: 'Amanecer',
-            sunset: 'Atardecer',
-            daylight: 'de luz solar'
-        },
-        en: {
-            search: 'Search for a location...',
-            currentLocation: 'Current Location',
-            sunrise: 'Sunrise',
-            sunset: 'Sunset',
-            daylight: 'of daylight'
-        },
-        fr: {
-            search: 'Rechercher un lieu...',
-            currentLocation: 'Position actuelle',
-            sunrise: 'Lever du soleil',
-            sunset: 'Coucher du soleil',
-            daylight: 'de lumière du jour'
-        },
-        pt: {
-            search: 'Buscar um local...',
-            currentLocation: 'Localização atual',
-            sunrise: 'Nascer do sol',
-            sunset: 'Pôr do sol',
-            daylight: 'de luz solar'
-        },
-        de: {
-            search: 'Einen Ort suchen...',
-            currentLocation: 'Aktueller Standort',
-            sunrise: 'Sonnenaufgang',
-            sunset: 'Sonnenuntergang',
-            daylight: 'Tageslicht'
-        }
-    };
-    
-    if (translations[lang] && translations[lang][key]) {
-        return translations[lang][key];
-    }
-    
-    // Fallback a español
-    return translations.es[key] || key;
-}
-
-// Sistema de internacionalización
-const translations = {
-    es: {
-        search: 'Buscar una ubicación...',
-        currentLocation: 'Ubicación actual',
-        feelsLike: 'Sensación térmica',
-        wind: 'Viento',
-        humidity: 'Humedad',
-        visibility: 'Visibilidad',
-        pressure: 'Presión',
-        hourlyForecast: 'Pronóstico por hora',
-        now: 'Ahora',
-        airQuality: 'Calidad del aire',
-        airQualityGood: 'Buena',
-        airQualityModerate: 'Moderada',
-        airQualityUnhealthySensitive: 'Mala para sensibles',
-        airQualityUnhealthy: 'Mala',
-        airQualityVeryUnhealthy: 'Muy mala',
-        airQualityDesc1: 'La calidad del aire es considerada satisfactoria y la contaminación del aire presenta poco o ningún riesgo.',
-        airQualityDesc2: 'La calidad del aire es aceptable, aunque puede haber preocupación para un pequeño número de personas sensibles.',
-        airQualityDesc3: 'Los miembros de grupos sensibles pueden experimentar efectos en la salud. El público en general no suele verse afectado.',
-        airQualityDesc4: 'Todos pueden comenzar a experimentar efectos en la salud. Los grupos sensibles pueden experimentar efectos más graves.',
-        airQualityDesc5: 'Alerta sanitaria: todos pueden experimentar efectos más graves en la salud.',
-        sunrise: 'Amanecer',
-        sunset: 'Atardecer',
-        daylightHours: 'horas',
-        daylightMinutes: 'minutos de luz solar',
-        forecastDays: ['Hoy', 'Miér', 'Jue', 'Vie', 'Sáb', 'Dom', 'Lun'],
-        weatherRadar: 'Radar Meteorológico',
-        interactiveMapLoading: 'Cargando mapa interactivo...',
-        animation: 'Animación',
-        fullScreen: 'Pantalla completa',
-        weatherNews: 'Noticias del tiempo',
-        terms: 'Términos',
-        privacy: 'Privacidad',
-        help: 'Ayuda',
-        contact: 'Contacto',
-        weatherData: 'Datos meteorológicos proporcionados por OpenWeather',
-        lastUpdated: 'Última actualización',
-        noResults: 'No se encontraron ciudades con',
-        tryAnother: 'Prueba con otro nombre o escribe al menos 3 letras',
-        searchingCities: 'Buscando ciudades...',
-        resultsFor: 'Resultados para',
-        popular: 'Popular',
-        searchMore: 'Buscar más ciudades con',
-        searchingMore: 'Buscando más ciudades...',
-        noMoreCities: 'No se encontraron más ciudades',
-        errorSearching: 'Error al buscar más ciudades',
-        backToResults: 'Volver a resultados principales',
-        extendedResults: 'Resultados extendidos para'
-    },
-    en: {
-        search: 'Search for a location...',
-        currentLocation: 'Current Location',
-        feelsLike: 'Feels like',
-        wind: 'Wind',
-        humidity: 'Humidity',
-        visibility: 'Visibility',
-        pressure: 'Pressure',
-        hourlyForecast: 'Hourly Forecast',
-        now: 'Now',
-        airQuality: 'Air Quality',
-        airQualityGood: 'Good',
-        airQualityModerate: 'Moderate',
-        airQualityUnhealthySensitive: 'Unhealthy for Sensitive Groups',
-        airQualityUnhealthy: 'Unhealthy',
-        airQualityVeryUnhealthy: 'Very Unhealthy',
-        airQualityDesc1: 'Air quality is considered satisfactory, and air pollution poses little or no risk.',
-        airQualityDesc2: 'Air quality is acceptable; however, there may be a concern for some people who are unusually sensitive to air pollution.',
-        airQualityDesc3: 'Members of sensitive groups may experience health effects. The general public is not likely to be affected.',
-        airQualityDesc4: 'Everyone may begin to experience health effects; members of sensitive groups may experience more serious health effects.',
-        airQualityDesc5: 'Health warnings of emergency conditions. The entire population is more likely to be affected.',
-        sunrise: 'Sunrise',
-        sunset: 'Sunset',
-        daylightHours: 'hours',
-        daylightMinutes: 'minutes of daylight',
-        forecastDays: ['Today', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon'],
-        weatherRadar: 'Weather Radar',
-        interactiveMapLoading: 'Interactive Map Loading...',
-        animation: 'Animation',
-        fullScreen: 'Full Screen',
-        weatherNews: 'Weather News',
-        terms: 'Terms',
-        privacy: 'Privacy',
-        help: 'Help',
-        contact: 'Contact',
-        weatherData: 'Weather data provided by OpenWeather',
-        lastUpdated: 'Last updated',
-        noResults: 'No cities found with',
-        tryAnother: 'Try another name or type at least 3 letters',
-        searchingCities: 'Searching cities...',
-        resultsFor: 'Results for',
-        popular: 'Popular',
-        searchMore: 'Search more cities with',
-        searchingMore: 'Searching more cities...',
-        noMoreCities: 'No more cities found',
-        errorSearching: 'Error searching for more cities',
-        backToResults: 'Back to main results',
-        extendedResults: 'Extended results for'
-    },
-    fr: {
-        search: 'Rechercher un lieu...',
-        currentLocation: 'Position actuelle',
-        feelsLike: 'Ressenti',
-        wind: 'Vent',
-        humidity: 'Humidité',
-        visibility: 'Visibilité',
-        pressure: 'Pression',
-        hourlyForecast: 'Prévisions horaires',
-        now: 'Maintenant',
-        airQuality: 'Qualité de l\'air',
-        airQualityGood: 'Bonne',
-        airQualityModerate: 'Modérée',
-        airQualityUnhealthySensitive: 'Mauvaise pour les sensibles',
-        airQualityUnhealthy: 'Mauvaise',
-        airQualityVeryUnhealthy: 'Très mauvaise',
-        airQualityDesc1: 'La qualité de l\'air est considérée comme satisfaisante et la pollution de l\'air présente peu ou pas de risque.',
-        airQualityDesc2: 'La qualité de l\'air est acceptable, mais il peut y avoir des préoccupations pour un petit nombre de personnes sensibles.',
-        airQualityDesc3: 'Les membres des groupes sensibles peuvent subir des effets sur leur santé. Le grand public n\'est généralement pas affecté.',
-        airQualityDesc4: 'Tout le monde peut commencer à ressentir des effets sur la santé. Les groupes sensibles peuvent subir des effets plus graves.',
-        airQualityDesc5: 'Alerte sanitaire: tout le monde peut subir des effets plus graves sur la santé.',
-        sunrise: 'Lever du soleil',
-        sunset: 'Coucher du soleil',
-        daylightHours: 'heures',
-        daylightMinutes: 'minutes de lumière du jour',
-        forecastDays: ['Auj.', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim', 'Lun'],
-        weatherRadar: 'Radar Météo',
-        interactiveMapLoading: 'Chargement de la carte interactive...',
-        animation: 'Animation',
-        fullScreen: 'Plein écran',
-        weatherNews: 'Actualités météo',
-        terms: 'Conditions',
-        privacy: 'Confidentialité',
-        help: 'Aide',
-        contact: 'Contact',
-        weatherData: 'Données météo fournies par OpenWeather',
-        lastUpdated: 'Dernière mise à jour',
-        noResults: 'Aucune ville trouvée avec',
-        tryAnother: 'Essayez un autre nom ou tapez au moins 3 lettres',
-        searchingCities: 'Recherche de villes...',
-        resultsFor: 'Résultats pour',
-        popular: 'Populaire',
-        searchMore: 'Rechercher plus de villes avec',
-        searchingMore: 'Recherche de plus de villes...',
-        noMoreCities: 'Aucune autre ville trouvée',
-        errorSearching: 'Erreur lors de la recherche de villes',
-        backToResults: 'Retour aux résultats principaux',
-        extendedResults: 'Résultats étendus pour'
-    },
-    pt: {
-        search: 'Buscar um local...',
-        currentLocation: 'Localização atual',
-        feelsLike: 'Sensação térmica',
-        wind: 'Vento',
-        humidity: 'Umidade',
-        visibility: 'Visibilidade',
-        pressure: 'Pressão',
-        hourlyForecast: 'Previsão por hora',
-        now: 'Agora',
-        airQuality: 'Qualidade do ar',
-        airQualityGood: 'Boa',
-        airQualityModerate: 'Moderada',
-        airQualityUnhealthySensitive: 'Ruim para sensíveis',
-        airQualityUnhealthy: 'Ruim',
-        airQualityVeryUnhealthy: 'Muito ruim',
-        airQualityDesc1: 'A qualidade do ar é considerada satisfatória e a poluição do ar apresenta pouco ou nenhum risco.',
-        airQualityDesc2: 'A qualidade do ar é aceitável, mas pode haver preocupação para um pequeno número de pessoas sensíveis.',
-        airQualityDesc3: 'Os membros de grupos sensíveis podem sentir efeitos na saúde. O público em geral normalmente não é afetado.',
-        airQualityDesc4: 'Todos podem começar a sentir efeitos na saúde. Grupos sensíveis podem sentir efeitos mais graves.',
-        airQualityDesc5: 'Alerta de saúde: todos podem sentir efeitos mais graves na saúde.',
-        sunrise: 'Nascer do sol',
-        sunset: 'Pôr do sol',
-        daylightHours: 'horas',
-        daylightMinutes: 'minutos de luz solar',
-        forecastDays: ['Hoje', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom', 'Seg'],
-        weatherRadar: 'Radar Meteorológico',
-        interactiveMapLoading: 'Carregando mapa interativo...',
-        animation: 'Animação',
-        fullScreen: 'Tela cheia',
-        weatherNews: 'Notícias do tempo',
-        terms: 'Termos',
-        privacy: 'Privacidade',
-        help: 'Ajuda',
-        contact: 'Contato',
-        weatherData: 'Dados meteorológicos fornecidos por OpenWeather',
-        lastUpdated: 'Última atualização',
-        noResults: 'Nenhuma cidade encontrada com',
-        tryAnother: 'Tente outro nome ou digite pelo menos 3 letras',
-        searchingCities: 'Procurando cidades...',
-        resultsFor: 'Resultados para',
-        popular: 'Popular',
-        searchMore: 'Buscar mais cidades com',
-        searchingMore: 'Buscando mais cidades...',
-        noMoreCities: 'Não foram encontradas mais cidades',
-        errorSearching: 'Erro ao buscar mais cidades',
-        backToResults: 'Voltar aos resultados principais',
-        extendedResults: 'Resultados estendidos para'
-    },
-    de: {
-        search: 'Einen Ort suchen...',
-        currentLocation: 'Aktueller Standort',
-        feelsLike: 'Gefühlt wie',
-        wind: 'Wind',
-        humidity: 'Luftfeuchtigkeit',
-        visibility: 'Sichtweite',
-        pressure: 'Luftdruck',
-        hourlyForecast: 'Stündliche Vorhersage',
-        now: 'Jetzt',
-        airQuality: 'Luftqualität',
-        airQualityGood: 'Gut',
-        airQualityModerate: 'Mäßig',
-        airQualityUnhealthySensitive: 'Ungesund für empfindliche Gruppen',
-        airQualityUnhealthy: 'Ungesund',
-        airQualityVeryUnhealthy: 'Sehr ungesund',
-        airQualityDesc1: 'Die Luftqualität wird als zufriedenstellend angesehen und die Luftverschmutzung stellt wenig oder kein Risiko dar.',
-        airQualityDesc2: 'Die Luftqualität ist akzeptabel, es kann jedoch Bedenken für eine kleine Anzahl sensibler Personen geben.',
-        airQualityDesc3: 'Mitglieder sensibler Gruppen können gesundheitliche Auswirkungen verspüren. Die breite Öffentlichkeit ist in der Regel nicht betroffen.',
-        airQualityDesc4: 'Jeder kann gesundheitliche Auswirkungen verspüren. Sensible Gruppen können schwerwiegendere Auswirkungen verspüren.',
-        airQualityDesc5: 'Gesundheitswarnung: Jeder kann schwerwiegendere gesundheitliche Auswirkungen verspüren.',
-        sunrise: 'Sonnenaufgang',
-        sunset: 'Sonnenuntergang',
-        daylightHours: 'Stunden',
-        daylightMinutes: 'Minuten Tageslicht',
-        forecastDays: ['Heute', 'Mi', 'Do', 'Fr', 'Sa', 'So', 'Mo'],
-        weatherRadar: 'Wetterradar',
-        interactiveMapLoading: 'Interaktive Karte wird geladen...',
-        animation: 'Animation',
-        fullScreen: 'Vollbild',
-        weatherNews: 'Wetternachrichten',
-        terms: 'Bedingungen',
-        privacy: 'Datenschutz',
-        help: 'Hilfe',
-        contact: 'Kontakt',
-        weatherData: 'Wetterdaten bereitgestellt von OpenWeather',
-        lastUpdated: 'Zuletzt aktualisiert',
-        noResults: 'Keine Städte gefunden mit',
-        tryAnother: 'Versuchen Sie einen anderen Namen oder geben Sie mindestens 3 Buchstaben ein',
-        searchingCities: 'Suche nach Städten...',
-        resultsFor: 'Ergebnisse für',
-        popular: 'Beliebt',
-        searchMore: 'Weitere Städte suchen mit',
-        searchingMore: 'Suche nach weiteren Städten...',
-        noMoreCities: 'Keine weiteren Städte gefunden',
-        errorSearching: 'Fehler bei der Suche nach weiteren Städten',
-        backToResults: 'Zurück zu den Hauptergebnissen',
-        extendedResults: 'Erweiterte Ergebnisse für'
-    }
-};
-
-// Función para obtener el idioma actual
-function getCurrentLanguage() {
-    return localStorage.getItem('weatheryn_language') || 'es';
-}
-
-// Función para actualizar la interfaz con el idioma seleccionado
-function updateUILanguage(lang) {
-    // Actualizar elementos de la interfaz
-    const elements = {
-        'input[type="text"]': { attr: 'placeholder', key: 'search' },
-        'button .material-symbols-outlined + span': { text: 'currentLocation' },
-        '.font-bold.text-lg:contains("Hourly")': { text: 'hourlyForecast' },
-        '.font-bold.text-lg:contains("Air")': { text: 'airQuality' },
-        '.font-bold.text-lg:contains("Sunrise")': { text: 'sunrise' },
-        '.font-bold.text-xl:contains("7-Day")': { text: 'forecastDays[0]' },
-        '.font-bold.text-lg:contains("Weather Radar")': { text: 'weatherRadar' },
-        '.font-bold.text-lg:contains("Weather News")': { text: 'weatherNews' },
-        'footer a:contains("Terms")': { text: 'terms' },
-        'footer a:contains("Privacy")': { text: 'privacy' },
-        'footer a:contains("Help")': { text: 'help' },
-        'footer a:contains("Contact")': { text: 'contact' }
-    };
-
-    // Actualizar idioma del selector
-    const languageSelect = document.getElementById('language-select');
-    if (languageSelect) {
-        languageSelect.value = lang;
-    }
-    
-    // Actualizar textos de la interfaz en función del idioma seleccionado
-    document.querySelectorAll('.text-gray-600.text-sm:contains("hours")').forEach(el => {
-        const text = el.textContent;
-        const match = text.match(/(\d+)\s+hours\s+(\d+)\s+minutes/);
-        if (match) {
-            const hours = match[1];
-            const minutes = match[2];
-            el.textContent = `${hours} ${t('daylightHours')} ${minutes} ${t('daylightMinutes')}`;
-        }
-    });
-    
-    // Actualizar los días de la semana en el pronóstico de 7 días
-    const weekdayElements = document.querySelectorAll('.grid.grid-cols-7.gap-2.font-medium.text-sm > div');
-    if (weekdayElements.length === 7) {
-        weekdayElements.forEach((el, index) => {
-            el.textContent = t(`forecastDays[${index}]`);
-        });
-    }
-}
 
 // Sistema de caché para datos meteorológicos
 class WeatherCache {
@@ -1366,138 +1031,139 @@ function updateFooter() {
 // Actualizar información de amanecer y atardecer
 function updateSunriseSunset(sunriseTimestamp, sunsetTimestamp, timezoneOffset) {
     // Convertir timestamps a hora local
-    const sunriseLocal = new Date(sunriseTimestamp * 1000);
-    const sunsetLocal = new Date(sunsetTimestamp * 1000);
-
-    // Formatear las horas para mostrar según el idioma actual
-    const localeMap = {
-        es: 'es-ES',
-        en: 'en-US',
-        fr: 'fr-FR',
-        pt: 'pt-PT',
-        de: 'de-DE'
-    };
+    const sunriseDate = new Date((sunriseTimestamp + timezoneOffset) * 1000);
+    const sunsetDate = new Date((sunsetTimestamp + timezoneOffset) * 1000);
     
-    const locale = localeMap[currentLanguage] || 'es-ES';
-    const sunriseTime = sunriseLocal.toLocaleTimeString(locale, { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: currentLanguage === 'en' 
-    });
-    const sunsetTime = sunsetLocal.toLocaleTimeString(locale, { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: currentLanguage === 'en'
-    });
-
-    // Actualizar los elementos HTML con las horas
-    const sunriseTimeEl = document.getElementById('sunrise-time');
-    const sunsetTimeEl = document.getElementById('sunset-time');
+    // Formatear las horas para mostrar
+    const sunriseTime = sunriseDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const sunsetTime = sunsetDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     
-    if (sunriseTimeEl) sunriseTimeEl.textContent = sunriseTime;
-    if (sunsetTimeEl) sunsetTimeEl.textContent = sunsetTime;
-
-    // Función para actualizar la barra de progreso
-    function updateProgressBar() {
-        const now = new Date();
-        const currentTime = now.getTime();
-        const sunriseTime = sunriseLocal.getTime();
-        const sunsetTime = sunsetLocal.getTime();
-
-        // Obtener los elementos de la barra de progreso
-        const progressBar = document.querySelector('.sun-progress-bar');
-        const sunIcon = document.querySelector('.sun-icon');
-        const progressFill = progressBar.querySelector('div');
-        
-        if (!progressBar || !sunIcon || !progressFill) {
-            console.error('No se encontraron elementos de la barra de progreso');
-            return;
-        }
-
-        let progress = 0;
-        let gradientColor = '';
-
-        // Calcular el progreso basado en la hora actual
-        if (currentTime < sunriseTime) {
-            // Antes del amanecer (noche)
-            progress = 0;
-            gradientColor = 'linear-gradient(to right, #1a1a2e, #16213e, #0f3460)';
-        } else if (currentTime > sunsetTime) {
-            // Después del atardecer (noche)
-            progress = 100;
-            gradientColor = 'linear-gradient(to right, #0f3460, #16213e, #1a1a2e)';
-        } else {
-            // Durante el día
-            progress = ((currentTime - sunriseTime) / (sunsetTime - sunriseTime)) * 100;
-            
-            // Definir colores según la hora del día
-            if (progress < 20) {
-                // Amanecer
-                gradientColor = `linear-gradient(to right, #1a1a2e, #16213e, #0f3460, #ff7e5f, #feb47b)`;
-            } else if (progress < 40) {
-                // Mañana
-                gradientColor = `linear-gradient(to right, #feb47b, #ff7e5f, #ffd194, #ffd194)`;
-            } else if (progress < 60) {
-                // Mediodía
-                gradientColor = `linear-gradient(to right, #ffd194, #ffd194, #ffd194, #ffd194)`;
-            } else if (progress < 80) {
-                // Tarde
-                gradientColor = `linear-gradient(to right, #ffd194, #ffd194, #ff7e5f, #feb47b)`;
-            } else {
-                // Atardecer
-                gradientColor = `linear-gradient(to right, #feb47b, #ff7e5f, #0f3460, #16213e, #1a1a2e)`;
-            }
-        }
-
-        // Aplicar el progreso y el color con una transición suave
-        progressBar.style.transition = 'background 1s ease-in-out';
-        progressBar.style.background = 'linear-gradient(to right, #e5e7eb, #e5e7eb)';
-        
-        // Actualizar el ancho y el color del relleno
-        progressFill.style.transition = 'width 1s ease-in-out, background 1s ease-in-out';
-        progressFill.style.width = `${progress}%`;
-        progressFill.style.background = gradientColor;
-        
-        // Mover el ícono del sol con una transición suave
-        sunIcon.style.transition = 'left 1s ease-in-out';
-        sunIcon.style.left = `${progress}%`;
-        
-        // Actualizar la clase del ícono del sol según la hora del día
-        if (progress === 0 || progress === 100) {
-            sunIcon.classList.remove('day');
-            sunIcon.classList.add('night');
-            sunIcon.style.background = '#f5f5f5';
-        } else {
-            sunIcon.classList.remove('night');
-            sunIcon.classList.add('day');
-            sunIcon.style.background = '#ffd700';
-        }
-        
-        console.log(`Barra de progreso actualizada: ${progress.toFixed(1)}%`);
-    }
-
-    // Actualizar inmediatamente
-    updateProgressBar();
-
-    // Configurar actualización cada minuto
-    const intervalId = setInterval(updateProgressBar, 60000);
-
-    // Limpiar el intervalo anterior si existe
+    // Actualizar los elementos de texto
+    const sunriseElement = document.querySelector('div.flex.items-center:first-child p.font-bold');
+    const sunsetElement = document.querySelector('div.flex.items-center:last-child p.font-bold');
+    
+    if (sunriseElement) sunriseElement.textContent = sunriseTime;
+    if (sunsetElement) sunsetElement.textContent = sunsetTime;
+    
+    // Limpiar cualquier intervalo anterior
     if (window.sunProgressInterval) {
         clearInterval(window.sunProgressInterval);
     }
-    window.sunProgressInterval = intervalId;
     
-    // Calcular duración del día en horas y minutos
-    const dayDurationMs = (sunsetTimestamp - sunriseTimestamp) * 1000;
-    const dayDurationHours = Math.floor(dayDurationMs / (1000 * 60 * 60));
-    const dayDurationMinutes = Math.floor((dayDurationMs % (1000 * 60 * 60)) / (1000 * 60));
-    
-    // Actualizar el texto de duración del día
-    const dayDurationElement = document.querySelector('.text-sm.text-gray-600.text-center');
-    if (dayDurationElement) {
-        dayDurationElement.textContent = `${dayDurationHours} horas ${dayDurationMinutes} minutos ${t('daylight')}`;
+    function updateProgressBar() {
+        const now = new Date();
+        const currentTime = now.getTime();
+        
+        // Obtener las horas de referencia para el día
+        const dayStart = new Date(sunriseDate);
+        dayStart.setHours(0, 0, 0, 0);
+        
+        const nightEnd = new Date(sunriseDate);
+        nightEnd.setHours(sunriseDate.getHours() - 1, sunriseDate.getMinutes(), 0, 0);
+        
+        const morningStart = new Date(sunriseDate);
+        const noonTime = new Date(sunriseDate);
+        noonTime.setHours(12, 0, 0, 0);
+        
+        const afternoonStart = new Date(sunriseDate);
+        afternoonStart.setHours(14, 0, 0, 0);
+        
+        const eveningStart = new Date(sunsetDate);
+        eveningStart.setHours(sunsetDate.getHours() - 1, sunsetDate.getMinutes(), 0, 0);
+        
+        const nightStart = new Date(sunsetDate);
+        nightStart.setHours(sunsetDate.getHours() + 1, sunsetDate.getMinutes(), 0, 0);
+        
+        const dayEnd = new Date(sunsetDate);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        const progressBar = document.getElementById('sun-progress');
+        const sunIndicator = document.getElementById('sun-indicator');
+        
+        if (!progressBar || !sunIndicator) {
+            console.warn('No se encontraron los elementos de la barra de progreso');
+            return;
+        }
+        
+        let progress = 0;
+        let gradient = '';
+        let sunColor = '';
+        
+        // Definir los colores para diferentes momentos del día
+        const colors = {
+            night: '#1a1a1a',      // Negro azulado para la noche
+            dawn: '#ff7e5f',       // Naranja rosado para el amanecer
+            morning: '#ffd700',    // Amarillo dorado para la mañana
+            noon: '#ffb300',       // Naranja brillante para el mediodía
+            afternoon: '#ff7043',  // Naranja rojizo para la tarde
+            dusk: '#b71c1c',      // Rojo oscuro para el atardecer
+            evening: '#37474f'     // Gris azulado para la noche
+        };
+        
+        // Calcular el progreso basado en los períodos del día
+        if (currentTime < sunriseDate.getTime()) {
+            // Antes del amanecer (noche a amanecer)
+            const totalNightTime = sunriseDate.getTime() - dayStart.getTime();
+            const timeFromNightStart = currentTime - dayStart.getTime();
+            progress = (timeFromNightStart / totalNightTime) * 25; // Máximo 25% antes del amanecer
+            gradient = `linear-gradient(to right, ${colors.night}, ${colors.dawn})`;
+            sunColor = colors.night;
+        } else if (currentTime < noonTime.getTime()) {
+            // Mañana (amanecer a mediodía)
+            const totalMorningTime = noonTime.getTime() - sunriseDate.getTime();
+            const timeFromSunrise = currentTime - sunriseDate.getTime();
+            progress = 25 + (timeFromSunrise / totalMorningTime) * 25;
+            gradient = `linear-gradient(to right, ${colors.dawn}, ${colors.morning})`;
+            sunColor = colors.morning;
+        } else if (currentTime < afternoonStart.getTime()) {
+            // Mediodía
+            const totalNoonTime = afternoonStart.getTime() - noonTime.getTime();
+            const timeFromNoon = currentTime - noonTime.getTime();
+            progress = 50 + (timeFromNoon / totalNoonTime) * 15;
+            gradient = `linear-gradient(to right, ${colors.morning}, ${colors.noon})`;
+            sunColor = colors.noon;
+        } else if (currentTime < eveningStart.getTime()) {
+            // Tarde
+            const totalAfternoonTime = eveningStart.getTime() - afternoonStart.getTime();
+            const timeFromAfternoon = currentTime - afternoonStart.getTime();
+            progress = 65 + (timeFromAfternoon / totalAfternoonTime) * 20;
+            gradient = `linear-gradient(to right, ${colors.noon}, ${colors.afternoon})`;
+            sunColor = colors.afternoon;
+        } else if (currentTime < sunsetDate.getTime()) {
+            // Atardecer
+            const totalEveningTime = sunsetDate.getTime() - eveningStart.getTime();
+            const timeFromEvening = currentTime - eveningStart.getTime();
+            progress = 85 + (timeFromEvening / totalEveningTime) * 15;
+            gradient = `linear-gradient(to right, ${colors.afternoon}, ${colors.dusk})`;
+            sunColor = colors.dusk;
+        } else {
+            // Noche
+            progress = 100;
+            gradient = `linear-gradient(to right, ${colors.dusk}, ${colors.night})`;
+            sunColor = colors.night;
+        }
+        
+        // Aplicar los cambios con transiciones suaves
+        progressBar.style.width = `${progress}%`;
+        progressBar.style.background = gradient;
+        sunIndicator.style.left = `${progress}%`;
+        sunIndicator.style.borderColor = sunColor;
+        
+        // Calcular la duración del día
+        const daylight = (sunsetDate.getTime() - sunriseDate.getTime()) / (1000 * 60); // Duración en minutos
+        const hours = Math.floor(daylight / 60);
+        const minutes = Math.floor(daylight % 60);
+        
+        // Actualizar el texto de la duración del día
+        const daylightText = document.querySelector('p.text-sm.text-gray-600.text-center');
+        if (daylightText) {
+            daylightText.textContent = `${hours} horas ${minutes} minutos de luz solar`;
+        }
     }
+    
+    // Actualizar inmediatamente y configurar el intervalo
+    updateProgressBar();
+    window.sunProgressInterval = setInterval(updateProgressBar, 60000); // Actualizar cada minuto
 }
 
 // Actualizar información de calidad del aire
@@ -2892,174 +2558,170 @@ function initializeAutocomplete() {
     });
 }
 
-// Inicializar la aplicación
-function initApp() {
-    // Obtener elementos del DOM
-    const searchInput = document.querySelector('input[type="text"]');
-    const currentLocationBtn = document.querySelector('button');
-    const languageSelect = document.getElementById('language-select');
-    
-    // Añadir enfoque automático al buscador
-    document.addEventListener('keydown', (event) => {
-        // Verificar si la tecla presionada es una letra (a-z, A-Z)
-        if (/^[a-zA-Z]$/.test(event.key)) {
-            // Verificar que el foco no esté ya en el buscador
-            if (document.activeElement !== searchInput) {
-                searchInput.focus();
-                // Añadir el carácter presionado al valor del input
-                searchInput.value += event.key;
-            }
-        }
-    });
-
+// Iniciar la aplicación cuando el DOM esté completamente cargado
+document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM cargado. Inicializando aplicación...');
     
-    // Inicializar selector de idioma
-    if (languageSelect) {
-        console.log('Selector de idioma encontrado');
-        languageSelect.addEventListener('change', (e) => {
-            console.log(`Cambiando idioma a: ${e.target.value}`);
-            setLanguage(e.target.value);
-            updateTexts();
-        });
-        
-        // Establecer idioma inicial
-        languageSelect.value = currentLanguage;
-    }
+    // Mostrar animación de bienvenida
+    const welcomeOverlay = document.createElement('div');
+    welcomeOverlay.className = 'fixed inset-0 bg-primary-500 bg-opacity-90 z-50 flex flex-col items-center justify-center text-white transition-all duration-1000';
+    welcomeOverlay.innerHTML = `
+        <div class="text-center px-4">
+            <h1 class="text-4xl font-bold mb-4">WeatheRyn</h1>
+            <p class="text-lg mb-8">Tu pronóstico meteorológico en tiempo real</p>
+            <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-white mb-4"></div>
+            <p>Cargando aplicación...</p>
+        </div>
+    `;
+    document.body.appendChild(welcomeOverlay);
     
-    // Función para actualizar textos según el idioma
-    function updateTexts() {
-        // Actualizar campo de búsqueda
-        if (searchInput) {
-            searchInput.placeholder = t('search');
-        }
-        
-        // Actualizar botón de ubicación actual
-        if (currentLocationBtn) {
-            const buttonText = currentLocationBtn.lastChild;
-            if (buttonText && buttonText.nodeType === Node.TEXT_NODE) {
-                buttonText.textContent = ` ${t('currentLocation')}`;
-            }
-        }
-        
-        // Actualizar títulos de tarjetas
-        document.querySelectorAll('.font-bold.text-lg.text-gray-800').forEach(el => {
-            if (el.textContent.includes('Sunrise') || el.textContent.includes('Amanecer')) {
-                el.textContent = `${t('sunrise')} & ${t('sunset')}`;
-            }
-        });
-    }
-    
-    // Actualizar textos iniciales
-    updateTexts();
+    // Ocultar la animación después de un momento
+    setTimeout(() => {
+        welcomeOverlay.style.opacity = '0';
+        setTimeout(() => {
+            welcomeOverlay.remove();
+        }, 1000);
+    }, 1500);
     
     // Inicializar autocompletado
     initializeAutocomplete();
     
-    // Cargar datos iniciales
-    loadInitialData();
+    // Event listeners
+    const searchInput = document.querySelector('input[type="text"]');
+    console.log('Campo de búsqueda:', searchInput);
     
-    // Iniciar reloj
-    startClock();
+    // Añadir event listener para el enfoque automático del buscador
+    document.addEventListener('keydown', (e) => {
+        // Verificar si el elemento activo es un input o si se está presionando una tecla especial
+        if (document.activeElement.tagName === 'INPUT' || 
+            e.ctrlKey || e.altKey || e.metaKey || 
+            e.key.length !== 1) {
+            return;
+        }
+        
+        // Verificar si la tecla presionada es una letra
+        const isLetter = /^[a-zA-Z]$/.test(e.key);
+        
+        if (isLetter) {
+            // Prevenir la escritura del carácter antes del enfoque
+            e.preventDefault();
+            
+            // Enfocar el campo de búsqueda
+            searchInput.focus();
+            
+            // Escribir la letra presionada en el campo de búsqueda
+            searchInput.value = e.key;
+            
+            // Disparar el evento input para activar el autocompletado
+            searchInput.dispatchEvent(new Event('input'));
+            
+            // Mover el cursor al final del texto
+            const length = searchInput.value.length;
+            searchInput.setSelectionRange(length, length);
+            
+            // Animar suavemente el campo de búsqueda
+            Animator.pulse(searchInput.parentElement, 1.02, 200);
+        }
+    });
     
-    // Botón de ubicación actual
-    if (currentLocationBtn) {
-        currentLocationBtn.addEventListener('click', async () => {
-            console.log('Obteniendo ubicación actual...');
+    searchInput.addEventListener('keypress', async (e) => {
+        if (e.key === 'Enter') {
+            const city = e.target.value;
+            console.log('Buscando ciudad:', city);
+            
+            // Animar búsqueda
+            const searchIcon = searchInput.nextElementSibling;
+            if (searchIcon) {
+                Animator.pulse(searchIcon, 1.2, 400);
+            }
+            
+            // Limpiar el campo de búsqueda
+            e.target.value = '';
             
             try {
-                // Efecto de carga sobre el botón
-                currentLocationBtn.classList.add('opacity-75');
-                currentLocationBtn.disabled = true;
-                
-                // Solicitar geolocalización
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        const { latitude, longitude } = position.coords;
-                        console.log(`Ubicación obtenida: ${latitude}, ${longitude}`);
-                        
-                        // Obtener datos del clima por coordenadas
-                        try {
-                            const weatherData = await getWeatherByCoordinates(latitude, longitude);
-                            updateWeatherUI(weatherData);
-                            
-                            // Obtener y actualizar pronóstico
-                            const forecastData = await getForecastByCoordinates(latitude, longitude);
-                            updateHourlyForecast(forecastData);
-                            update7DayForecast(forecastData);
-                            
-                            // Actualizar el radar meteorológico
-                            updateWeatherRadar(latitude, longitude);
-                        } catch (error) {
-                            console.error('Error al obtener datos del clima por coordenadas:', error);
-                        }
-                        
-                        // Restaurar botón
-                        currentLocationBtn.classList.remove('opacity-75');
-                        currentLocationBtn.disabled = false;
-                    },
-                    (error) => {
-                        console.error('Error al obtener ubicación:', error);
-                        
-                        // Restaurar botón
-                        currentLocationBtn.classList.remove('opacity-75');
-                        currentLocationBtn.disabled = false;
-                        
-                        // Mostrar error
-                        alert('No se pudo obtener tu ubicación. Verifica que hayas dado permiso para acceder a tu ubicación.');
-                    },
-                    {
-                        enableHighAccuracy: false,
-                        timeout: 5000,
-                        maximumAge: 0
-                    }
-                );
+                const weatherData = await getWeatherData(city);
+                if (weatherData) {
+                    // Actualizar la interfaz principal
+                    updateWeatherUI(weatherData);
+                    
+                    // Obtener y actualizar pronósticos
+                    const forecastData = await getForecastData(city);
+                    updateHourlyForecast(forecastData);
+                    update7DayForecast(forecastData);
+                }
             } catch (error) {
-                console.error('Error al solicitar geolocalización:', error);
-                currentLocationBtn.classList.remove('opacity-75');
-                currentLocationBtn.disabled = false;
+                console.error('Error al buscar ciudad:', error);
             }
-        });
-    } else {
-        console.error('No se encontró el botón de ubicación actual');
-    }
-    
-    // Campo de búsqueda
-    if (searchInput) {
-        searchInput.addEventListener('keypress', async (e) => {
-            if (e.key === 'Enter') {
-                const city = e.target.value;
-                console.log('Buscando ciudad:', city);
-                
-                // Animar búsqueda
-                const searchIcon = searchInput.nextElementSibling;
-                if (searchIcon) {
-                    Animator.pulse(searchIcon, 1.2, 400);
-                }
-                
-                // Limpiar el campo de búsqueda
-                e.target.value = '';
-                
-                try {
-                    const weatherData = await getWeatherData(city);
-                    if (weatherData) {
-                        // Actualizar la interfaz principal
-                        updateWeatherUI(weatherData);
-                        
-                        // Obtener y actualizar pronósticos
-                        const forecastData = await getForecastData(city);
-                        updateHourlyForecast(forecastData);
-                        update7DayForecast(forecastData);
-                    }
-                } catch (error) {
-                    console.error('Error al buscar ciudad:', error);
-                }
-            }
-        });
-    } else {
-        console.error('No se encontró el campo de búsqueda');
-    }
-}
+        }
+    });
 
-// Inicializar la aplicación
-document.addEventListener('DOMContentLoaded', initApp); 
+    // Botón de ubicación actual
+    const locationButton = document.querySelector('button');
+    console.log('Botón de ubicación:', locationButton);
+    
+    locationButton.addEventListener('click', async () => {
+        // Animar el botón
+        Animator.pulse(locationButton, 1.1, 300);
+        
+        if (navigator.geolocation) {
+            // Mostrar animación de carga en el botón
+            const originalContent = locationButton.innerHTML;
+            locationButton.innerHTML = `
+                <div class="flex items-center">
+                    <div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    <span>Localizando...</span>
+                </div>
+            `;
+            
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const { latitude, longitude } = position.coords;
+                try {
+                    // Obtener datos del clima por coordenadas
+                    const response = await axios.get(`${BASE_URL}/weather`, {
+                        params: {
+                            lat: latitude,
+                            lon: longitude,
+                            appid: API_KEY,
+                            units: 'metric'
+                        }
+                    });
+                    
+                    // Restaurar el botón
+                    locationButton.innerHTML = originalContent;
+                    
+                    // Actualizar interfaz
+                    updateWeatherUI(response.data);
+                    
+                    // Obtener y actualizar pronósticos
+                    const forecastResponse = await axios.get(`${BASE_URL}/forecast`, {
+                        params: {
+                            lat: latitude,
+                            lon: longitude,
+                            appid: API_KEY,
+                            units: 'metric'
+                        }
+                    });
+                    updateHourlyForecast(forecastResponse.data);
+                    update7DayForecast(forecastResponse.data);
+                } catch (error) {
+                    // Restaurar el botón
+                    locationButton.innerHTML = originalContent;
+                    
+                    console.error('Error al obtener datos del clima por ubicación:', error);
+                    alert('Error al obtener datos del clima. Por favor, intenta de nuevo.');
+                }
+            }, (error) => {
+                // Restaurar el botón
+                locationButton.innerHTML = originalContent;
+                
+                console.error('Error al obtener la ubicación:', error);
+                alert('No se pudo acceder a la ubicación. Por favor, busca manualmente.');
+            });
+        } else {
+            alert('La geolocalización no está soportada en este navegador.');
+        }
+    });
+    
+    // Cargar datos iniciales
+    loadInitialData();
+}); 

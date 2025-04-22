@@ -459,6 +459,7 @@ async function getForecastData(city) {
 // Función para obtener datos de calidad del aire
 async function getAirQualityData(lat, lon) {
     try {
+        console.log('Obteniendo datos de calidad del aire para:', { lat, lon });
         const locationKey = `${lat.toFixed(2)},${lon.toFixed(2)}`;
         
         // Función para obtener datos frescos de calidad del aire
@@ -470,11 +471,14 @@ async function getAirQualityData(lat, lon) {
                     appid: API_KEY
                 }
             });
+            console.log('Datos de calidad del aire recibidos:', response.data);
             return response.data;
         };
         
         // Intentar obtener datos de la caché o hacer una nueva petición
-        return await WeatherCache.getWithUpdate('airQuality', locationKey, fetchFreshAirQuality);
+        const data = await WeatherCache.getWithUpdate('airQuality', locationKey, fetchFreshAirQuality);
+        console.log('Datos de calidad del aire (desde caché o frescos):', data);
+        return data;
     } catch (error) {
         console.error('Error al obtener datos de calidad del aire:', error);
         
@@ -773,9 +777,7 @@ function updateLocalTime(timezoneOffset) {
 }
 
 // Función para actualizar la interfaz de usuario con datos del clima
-function updateWeatherUI(data) {
-    if (!data) return;
-
+async function updateWeatherUI(data) {
     try {
         console.log('Actualizando UI con datos:', data);
         
@@ -890,11 +892,20 @@ function updateWeatherUI(data) {
         updateSunriseSunset(data.sys.sunrise, data.sys.sunset, data.timezone);
         
         // Obtener y actualizar calidad del aire
-        getAirQualityData(data.coord.lat, data.coord.lon)
-            .then(airQualityData => {
-                updateAirQuality(airQualityData);
-            });
-            
+        if (data.coord) {
+            console.log('Obteniendo calidad del aire para coordenadas:', data.coord);
+            try {
+                const airQualityData = await getAirQualityData(data.coord.lat, data.coord.lon);
+                if (airQualityData) {
+                    updateAirQuality(airQualityData);
+                } else {
+                    console.error('No se pudieron obtener datos de calidad del aire');
+                }
+            } catch (error) {
+                console.error('Error al actualizar calidad del aire:', error);
+            }
+        }
+        
         // Actualizar zona horaria y hora local
         getTimezoneData(data.coord.lat, data.coord.lon)
             .then(timezoneData => {
@@ -1112,68 +1123,84 @@ function updateSunriseSunset(sunrise, sunset, timezone = 0) {
 // Actualizar información de calidad del aire
 function updateAirQuality(airQualityData) {
     if (!airQualityData || !airQualityData.list || airQualityData.list.length === 0) {
-        console.error('Datos de calidad del aire no válidos');
+        console.error('Datos de calidad del aire no válidos:', airQualityData);
         return;
     }
-    
-    const airQuality = airQualityData.list[0];
-    const aqi = airQuality.main.aqi; // Índice de 1 (Bueno) a 5 (Muy malo)
-    
-    // Mapear AQI a texto y color
-    const aqiInfo = {
-        1: { text: 'Buena', color: 'green-500', width: '1/4' },
-        2: { text: 'Moderada', color: 'yellow-500', width: '2/4' },
-        3: { text: 'Mala para sensibles', color: 'orange-500', width: '3/4' },
-        4: { text: 'Mala', color: 'red-500', width: '3/4' },
-        5: { text: 'Muy mala', color: 'purple-500', width: 'full' }
-    };
-    
-    const info = aqiInfo[aqi] || aqiInfo[1];
-    
-    // Buscar la sección de calidad del aire
-    const airQualitySection = document.querySelector('h3.font-bold.text-lg.text-gray-800');
-    let airQualityContainer = null;
-    
-    // Buscar el título "Air Quality" y obtener su contenedor
-    if (airQualitySection) {
-        const allSections = document.querySelectorAll('h3.font-bold.text-lg.text-gray-800');
-        for (let i = 0; i < allSections.length; i++) {
-            if (allSections[i].textContent.includes('Air Quality')) {
-                airQualityContainer = allSections[i].closest('.bg-white.rounded-xl.p-5');
-                break;
-            }
-        }
-    }
-    
+
+    // Buscar el contenedor de calidad del aire
+    const airQualityContainer = document.querySelector('[data-air-quality]');
     if (!airQualityContainer) {
-        console.error('No se pudo encontrar el contenedor de calidad del aire');
+        console.error('No se encontró el contenedor de calidad del aire');
         return;
     }
-    
-    // Ahora podemos buscar elementos dentro del contenedor específico
-    const aqiBarElement = airQualityContainer.querySelector('.h-2.flex-1.bg-gray-200 .h-full');
-    const aqiTextElement = airQualityContainer.querySelector('.ml-3.font-bold');
-    const aqiDescElement = airQualityContainer.querySelector('.text-gray-600.text-sm');
-    
-    if (aqiBarElement) {
-        aqiBarElement.className = `h-full w-${info.width} bg-${info.color} rounded-full`;
-    }
-    
-    if (aqiTextElement) {
-        aqiTextElement.textContent = info.text;
-        aqiTextElement.className = `ml-3 font-bold text-${info.color}`;
-    }
-    
-    if (aqiDescElement) {
-        const descriptions = {
-            1: 'La calidad del aire es considerada satisfactoria y la contaminación del aire presenta poco o ningún riesgo.',
-            2: 'La calidad del aire es aceptable, aunque puede haber preocupación para un pequeño número de personas sensibles.',
-            3: 'Los miembros de grupos sensibles pueden experimentar efectos en la salud. El público en general no suele verse afectado.',
-            4: 'Todos pueden comenzar a experimentar efectos en la salud. Los grupos sensibles pueden experimentar efectos más graves.',
-            5: 'Alerta sanitaria: todos pueden experimentar efectos más graves en la salud.'
-        };
+
+    try {
+        const aqi = airQualityData.list[0].main.aqi;
+        console.log('AQI recibido:', aqi, typeof aqi);
         
-        aqiDescElement.textContent = descriptions[aqi] || descriptions[1];
+        const components = airQualityData.list[0].components;
+        console.log('Componentes:', components);
+
+        // Definir los niveles de calidad del aire
+        const aqiLevels = {
+            1: { text: 'Buena', color: 'text-green-500', bg: 'bg-green-500/20', description: 'La calidad del aire es satisfactoria y la contaminación del aire presenta poco o ningún riesgo.' },
+            2: { text: 'Moderada', color: 'text-yellow-500', bg: 'bg-yellow-500/20', description: 'La calidad del aire es aceptable. Sin embargo, puede haber un riesgo para algunos grupos sensibles.' },
+            3: { text: 'Dañina para grupos sensibles', color: 'text-orange-500', bg: 'bg-orange-500/20', description: 'Los miembros de grupos sensibles pueden experimentar efectos en la salud.' },
+            4: { text: 'Dañina', color: 'text-red-500', bg: 'bg-red-500/20', description: 'Algunos miembros de la población general pueden experimentar efectos en la salud.' },
+            5: { text: 'Muy dañina', color: 'text-purple-500', bg: 'bg-purple-500/20', description: 'Advertencia de emergencia sanitaria. Toda la población probablemente se verá afectada.' }
+        };
+
+        // Asegurarse de que aqi es un número válido
+        const validAqi = Number(aqi);
+        if (isNaN(validAqi) || validAqi < 1 || validAqi > 5) {
+            console.error('AQI no válido:', aqi);
+            return;
+        }
+
+        const level = aqiLevels[validAqi];
+        console.log('Nivel seleccionado:', level);
+
+        if (!level) {
+            console.error('No se encontró nivel para AQI:', validAqi);
+            return;
+        }
+
+        // Calcular el porcentaje para la barra de progreso
+        const maxAqi = 5;
+        const progress = Math.min((validAqi / maxAqi) * 100, 100);
+        console.log('Progreso calculado:', progress);
+
+        // Actualizar el HTML con la información
+        const html = `
+            <h3 class="font-bold text-lg text-gray-800 mb-3">Calidad del Aire</h3>
+            <div class="flex items-center mb-3">
+                <div class="h-2 flex-1 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-full transition-all duration-500 ${level.bg}" style="width: ${progress}%"></div>
+                </div>
+                <span class="ml-3 font-bold ${level.color}">${level.text}</span>
+            </div>
+            <p class="text-gray-600 text-sm">${level.description}</p>
+        `;
+
+        // Actualizar el contenido
+        airQualityContainer.innerHTML = html;
+
+        // Añadir animación de entrada
+        Animator.fadeIn(airQualityContainer);
+
+        console.log('Calidad del aire actualizada:', { 
+            aqi: validAqi, 
+            level: level.text, 
+            progress,
+            components: {
+                pm25: components.pm2_5,
+                pm10: components.pm10,
+                no2: components.no2,
+                o3: components.o3
+            }
+        });
+    } catch (error) {
+        console.error('Error al actualizar la calidad del aire:', error);
     }
 }
 

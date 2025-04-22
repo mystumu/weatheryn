@@ -102,4 +102,21 @@ pnpm-lock.yaml
 # Archivos de sistema
 Thumbs.db
 ehthumbs.db
-Desktop.ini 
+Desktop.ini
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Testing
+coverage
+.nyc_output
+
+# Production
+build
+
+# Cache
+.cache
+.temp
+.eslintcache 

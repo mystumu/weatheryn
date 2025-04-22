@@ -1,29 +1,15 @@
 import axios from 'axios';
+import * as L from 'leaflet';
+import { config } from './config.js';
 
-// Ocultar API key usando variables de entorno o almacenamiento local
-// Si no está disponible, usar la del código pero advertir sobre seguridad
-let API_KEY = '';
+// Configuración de las API keys y URLs base
+const API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY;
+const BASE_URL = import.meta.env.VITE_OPENWEATHER_BASE_URL;
+const GEO_URL = import.meta.env.VITE_OPENWEATHER_GEO_URL;
 
-// Intentar obtener la API key de localStorage si fue guardada previamente
-try {
-    const storedApiKey = localStorage.getItem('weatherApiKey');
-    if (storedApiKey) {
-        API_KEY = storedApiKey;
-        console.log('API key cargada desde localStorage');
-    } else {
-        // Si no existe en localStorage, usar la del código como fallback
-        API_KEY = 'f611dbf556d4e840dc888c29b727d928';
-        // Guardar en localStorage para futuros usos
-        localStorage.setItem('weatherApiKey', API_KEY);
-        console.warn('Usando API key por defecto. En un entorno de producción, esto debería manejarse de forma segura.');
-    }
-} catch (error) {
-    // En caso de error (ej. localStorage deshabilitado), usar la del código
-    API_KEY = 'f611dbf556d4e840dc888c29b727d928';
-    console.warn('No se pudo acceder a localStorage. Usando API key por defecto.');
+if (!API_KEY) {
+    console.error('Error: No se ha encontrado la clave API de OpenWeather. Por favor, configura VITE_OPENWEATHER_API_KEY en el archivo .env');
 }
-
-const BASE_URL = 'https://api.openweathermap.org/data/2.5';
 
 // Sistema de caché para datos meteorológicos
 class WeatherCache {
@@ -522,251 +508,184 @@ async function getTimezoneData(lat, lon) {
 // Función para obtener noticias meteorológicas
 async function getWeatherNews(country = 'es') {
     try {
-        // Intentamos primero con NewsAPI - si falla, tenemos fallback
-        let response;
-        
-        try {
-            // Intento con la API de GNews (limitado a 100 solicitudes por día)
-            response = await axios.get('https://gnews.io/api/v4/search', {
-                params: {
-                    q: 'weather OR climate OR meteorology',
-                    lang: 'es',
-                    country: country,
-                    max: 10,
-                    apikey: '98d5caf2f8d7c1eac98eefc2de9b3493' // API key de GNews (gratuita, limitada)
-                },
-                timeout: 3000 // timeout de 3 segundos para evitar esperas largas
-            });
-            
-            if (response.data && response.data.articles && response.data.articles.length > 0) {
-                return response.data;
-            }
-        } catch (apiError) {
-            console.log('Error con la API de noticias principal, usando alternativa:', apiError);
+        const apiKey = localStorage.getItem('gnews_api_key');
+        if (!apiKey) {
+            throw new Error('API key de GNews no configurada');
         }
+
+        const query = encodeURIComponent('weather OR climate OR meteorology');
+        const url = `https://gnews.io/api/v4/search?q=${query}&lang=${country}&country=${country}&max=10&apikey=${apiKey}`;
         
-        // Si falla la primera opción, intentamos con una alternativa
-        try {
-            // Alternativa: RSS feed con proxy CORS
-            const rssUrl = 'https://api.rss2json.com/v1/api.json?rss_url=https://www.climatechangenews.com/feed/';
-            response = await axios.get(rssUrl);
-            
-            if (response.data && response.data.items) {
-                // Convertir al formato esperado
-                return {
-                    articles: response.data.items.map(item => ({
-                        title: item.title,
-                        description: item.description.replace(/<[^>]*>?/gm, '').substring(0, 150), // quitar HTML
-                        url: item.link,
-                        publishedAt: item.pubDate,
-                        source: { name: response.data.feed.title || 'Noticias del Clima' }
-                    }))
-                };
-            }
-        } catch (rssError) {
-            console.log('Error con la fuente RSS, usando noticias simuladas:', rssError);
+        const response = await axios.get(url);
+        if (response.data && response.data.articles) {
+            return response.data.articles;
         }
-        
-        // Si todo falla, devolvemos noticias simuladas
-        console.log('Usando noticias simuladas...');
-        return {
-            articles: [
-                {
-                    title: 'Ola de calor extrema afecta el sur de Europa',
-                    description: 'Las temperaturas han alcanzado niveles récord en varias ciudades, causando preocupación por incendios forestales y problemas de salud.',
-                    image: 'https://via.placeholder.com/100',
-                    publishedAt: new Date().toISOString(),
-                    source: { name: 'Noticias Meteorológicas' },
-                    url: '#'
-                },
-                {
-                    title: 'Científicos alertan sobre el impacto del cambio climático en patrones meteorológicos',
-                    description: 'Un nuevo estudio revela cómo el calentamiento global está alterando los sistemas climáticos tradicionales en todo el mundo.',
-                    image: 'https://via.placeholder.com/100',
-                    publishedAt: new Date(Date.now() - 86400000).toISOString(),
-                    source: { name: 'Revista Científica' },
-                    url: '#'
-                },
-                {
-                    title: country === 'es' ? 'El nivel del mar aumentará más rápido de lo previsto' : 'Sea levels rising faster than expected',
-                    description: country === 'es' ? 'Según un nuevo informe, el aumento del nivel del mar está acelerándose debido al derretimiento de los glaciares y casquetes polares.' : 'According to a new report, sea level rise is accelerating due to melting glaciers and ice caps.',
-                    image: 'https://via.placeholder.com/100',
-                    publishedAt: new Date(Date.now() - 172800000).toISOString(),
-                    source: { name: country === 'es' ? 'Instituto Oceanográfico' : 'Oceanographic Institute' },
-                    url: '#'
-                }
-            ]
-        };
+        throw new Error('Formato de respuesta inválido');
     } catch (error) {
-        console.error('Error al obtener noticias meteorológicas:', error);
+        console.warn('Error con la API de noticias principal:', error);
         
-        // Si falla todo, devolvemos noticias simuladas como último recurso
-        return {
-            articles: [
-                {
-                    title: 'Ola de calor extrema afecta el sur de Europa',
-                    description: 'Las temperaturas han alcanzado niveles récord en varias ciudades, causando preocupación por incendios forestales y problemas de salud.',
-                    image: 'https://via.placeholder.com/100',
-                    publishedAt: new Date().toISOString(),
-                    source: { name: 'Noticias Meteorológicas' },
-                    url: '#'
-                },
-                {
-                    title: 'Científicos alertan sobre el impacto del cambio climático en patrones meteorológicos',
-                    description: 'Un nuevo estudio revela cómo el calentamiento global está alterando los sistemas climáticos tradicionales en todo el mundo.',
-                    image: 'https://via.placeholder.com/100',
-                    publishedAt: new Date(Date.now() - 86400000).toISOString(),
-                    source: { name: 'Revista Científica' },
-                    url: '#'
-                }
-            ]
-        };
+        // Si es un error de autenticación, redirigir a la página de configuración
+        if (error.response && error.response.status === 401) {
+            localStorage.removeItem('gnews_api_key'); // Limpiar la key inválida
+            window.location.href = 'config.html?error=invalid_gnews_key';
+            return null;
+        }
+        
+        // Intentar con API alternativa o mostrar mensaje de error
+        return null;
     }
 }
 
 // Función para actualizar la sección de noticias meteorológicas
 async function updateWeatherNews(country) {
     try {
-        // Buscar el contenedor de noticias meteorológicas
-        let newsContainer = null;
-        const allSections = document.querySelectorAll('h3.font-bold.text-lg.text-gray-800');
-        
-        for (let i = 0; i < allSections.length; i++) {
-            if (allSections[i].textContent.includes('Weather News')) {
-                newsContainer = allSections[i].closest('.bg-white.rounded-xl.p-5');
-                break;
-            }
-        }
-        
-        // Si no lo encontramos con el título, tomamos la última sección
+        const newsContainer = document.getElementById('weather-news');
         if (!newsContainer) {
-            const allContainers = document.querySelectorAll('.bg-white.rounded-xl.p-5');
-            if (allContainers.length > 0) {
-                newsContainer = allContainers[allContainers.length - 1];
-            }
-        }
-        
-        if (!newsContainer) {
-            console.error('No se encontró el contenedor de noticias meteorológicas');
+            console.warn('No se encontró el contenedor de noticias');
             return;
         }
+
+        // Mostrar estado de carga
+        newsContainer.innerHTML = `
+            <div class="flex items-center justify-center p-4">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+                <span class="ml-2 text-gray-600">Cargando noticias...</span>
+            </div>
+        `;
+
+        const articles = await getWeatherNews(country);
         
-        // Mostrar animación de carga
-        const removeLoading = Animator.addLoadingEffect(newsContainer, 'Actualizando noticias...');
-        
-        // Obtener noticias basadas en el país
-        const countryCode = country ? country.toLowerCase() : 'es';
-        const newsData = await getWeatherNews(countryCode);
-        
-        // Quitar animación de carga
-        removeLoading();
-        
-        if (!newsData || !newsData.articles || newsData.articles.length === 0) {
-            console.error('No se pudieron obtener noticias');
+        if (!articles || articles.length === 0) {
+            newsContainer.innerHTML = `
+                <div class="text-center p-4">
+                    <span class="material-symbols-outlined text-4xl text-gray-400">news_off</span>
+                    <p class="text-gray-600 mt-2">No hay noticias disponibles en este momento</p>
+                </div>
+            `;
             return;
         }
-        
-        // Cambiar el título para reflejar que son noticias locales
-        const newsTitle = newsContainer.querySelector('h3.font-bold');
-        if (newsTitle) {
-            newsTitle.textContent = `Noticias meteorológicas ${country === 'es' ? 'de España' : `de ${country}`}`;
-            Animator.pulse(newsTitle);
-        }
-        
-        // Seleccionar el contenedor de artículos de noticias
-        const newsItemsContainer = newsContainer.querySelector('.space-y-4');
-        if (!newsItemsContainer) {
-            console.error('No se encontró el contenedor de elementos de noticias');
-            return;
-        }
-        
-        // Limpiar contenedor con animación
-        newsItemsContainer.style.opacity = '0';
-        setTimeout(() => {
-            newsItemsContainer.innerHTML = '';
-            
-            // Añadir las dos primeras noticias
-            const articlesToShow = newsData.articles.slice(0, 2);
-            
-            // Iconos según el contenido de la noticia
-            const getIconForNews = (title, description) => {
-                const content = (title + ' ' + description).toLowerCase();
-                if (content.includes('lluvia') || content.includes('tormenta') || content.includes('precipitación')) {
-                    return 'water';
-                } else if (content.includes('calor') || content.includes('temperatura') || content.includes('verano')) {
-                    return 'thermostat';
-                } else if (content.includes('nieve') || content.includes('frío') || content.includes('hielo')) {
-                    return 'ac_unit';
-                } else if (content.includes('viento') || content.includes('huracán') || content.includes('ciclón')) {
-                    return 'air';
-                } else if (content.includes('inundación') || content.includes('diluvio')) {
-                    return 'flood';
-                } else {
-                    return 'cloud';
-                }
-            };
-            
-            // Colores según el icono
-            const getColorForIcon = (icon) => {
-                const colorMap = {
-                    'water': 'blue',
-                    'thermostat': 'amber',
-                    'ac_unit': 'cyan',
-                    'air': 'indigo',
-                    'flood': 'purple',
-                    'cloud': 'gray'
-                };
-                
-                return colorMap[icon] || 'blue';
-            };
-            
-            articlesToShow.forEach((article, index) => {
-                const icon = getIconForNews(article.title, article.description || '');
-                const color = getColorForIcon(icon);
-                const date = new Date(article.publishedAt);
-                const formattedDate = date.toLocaleDateString('es-ES', {
-                    day: 'numeric',
-                    month: 'short'
-                });
-                
-                // Crear elemento de noticia
-                const newsItem = document.createElement('div');
-                newsItem.className = `flex items-start ${index < articlesToShow.length - 1 ? 'border-b border-gray-100 pb-3' : ''}`;
-                newsItem.style.opacity = '0';
-                newsItem.style.transform = 'translateY(20px)';
-                newsItem.style.transition = `all 500ms ease-out ${index * 200}ms`;
-                
-                newsItem.innerHTML = `
-                    <div class="bg-${color}-100 rounded w-16 h-16 flex-shrink-0 flex items-center justify-center">
-                        <span class="material-symbols-outlined text-${color}-500 text-2xl">${icon}</span>
-                    </div>
-                    <div class="ml-3">
-                        <a href="${article.url}" target="_blank" class="block">
-                            <h4 class="font-medium text-gray-800">${article.title}</h4>
-                            <p class="text-gray-600 text-sm mt-1">${article.description ? article.description.substring(0, 80) + '...' : 'Sin descripción disponible'}</p>
-                            <p class="text-gray-400 text-xs mt-1">${formattedDate} • ${article.source.name}</p>
-                        </a>
-                    </div>
-                `;
-                
-                newsItemsContainer.appendChild(newsItem);
-                
-                // Aplicar animación después de un breve retraso
-                setTimeout(() => {
-                    newsItem.style.opacity = '1';
-                    newsItem.style.transform = 'translateY(0)';
-                }, 50);
-            });
-            
-            // Mostrar el contenedor con animación
-            newsItemsContainer.style.opacity = '1';
-        }, 300);
+
+        // Guardar los artículos en una variable global para acceder desde showMoreNews
+        window.newsArticles = articles;
+
+        // Mostrar solo la primera noticia inicialmente
+        renderNews(articles, 1);
         
         console.log('Noticias meteorológicas actualizadas correctamente');
     } catch (error) {
-        console.error('Error al actualizar noticias meteorológicas:', error);
+        console.error('Error al actualizar noticias:', error);
+        if (newsContainer) {
+            newsContainer.innerHTML = `
+                <div class="text-center p-4">
+                    <span class="material-symbols-outlined text-4xl text-red-400">error</span>
+                    <p class="text-gray-600 mt-2">No se pudieron cargar las noticias</p>
+                    <button onclick="updateWeatherNews('${country}')" 
+                            class="mt-2 text-sm text-amber-500 hover:text-amber-600">
+                        Reintentar
+                    </button>
+                </div>
+            `;
+        }
     }
 }
+
+// Función para renderizar las noticias
+function renderNews(articles, numArticles) {
+    const newsContainer = document.getElementById('weather-news');
+    if (!newsContainer || !articles) return;
+
+    const getIconForNews = (title, description) => {
+        const text = (title + ' ' + description).toLowerCase();
+        if (text.includes('lluvia') || text.includes('precipitacion')) return 'rainy';
+        if (text.includes('nube')) return 'cloudy';
+        if (text.includes('sol')) return 'sunny';
+        if (text.includes('viento')) return 'air';
+        if (text.includes('temperatura') || text.includes('calor') || text.includes('frío')) return 'device_thermostat';
+        if (text.includes('tormenta')) return 'thunderstorm';
+        if (text.includes('nieve')) return 'weather_snowy';
+        return 'newspaper';
+    };
+
+    const getColorForIcon = (icon) => {
+        switch (icon) {
+            case 'rainy': return 'text-blue-500';
+            case 'cloudy': return 'text-gray-500';
+            case 'sunny': return 'text-amber-500';
+            case 'air': return 'text-teal-500';
+            case 'device_thermostat': return 'text-red-500';
+            case 'thunderstorm': return 'text-purple-500';
+            case 'weather_snowy': return 'text-blue-300';
+            default: return 'text-gray-600';
+        }
+    };
+
+    // Mostrar el número especificado de noticias
+    const visibleArticles = articles.slice(0, numArticles);
+
+    const newsHTML = visibleArticles.map(article => {
+        const icon = getIconForNews(article.title, article.description);
+        const iconColor = getColorForIcon(icon);
+        const date = new Date(article.publishedAt).toLocaleDateString('es-ES', {
+            day: 'numeric',
+            month: 'long'
+        });
+
+        return `
+            <a href="${article.url}" target="_blank" 
+               class="block p-4 hover:bg-gray-50 transition-colors duration-200 border-b border-gray-100">
+                <div class="flex items-start">
+                    <span class="material-symbols-outlined ${iconColor} text-2xl mr-3">${icon}</span>
+                    <div class="flex-1">
+                        <h3 class="font-semibold text-gray-900 mb-1">${article.title}</h3>
+                        <p class="text-gray-600 text-sm mb-2">${article.description}</p>
+                        <div class="flex items-center text-xs text-gray-500">
+                            <span class="material-symbols-outlined text-sm mr-1">calendar_today</span>
+                            ${date}
+                            <span class="mx-2">•</span>
+                            <span class="material-symbols-outlined text-sm mr-1">public</span>
+                            ${article.source.name}
+                        </div>
+                    </div>
+                </div>
+            </a>
+        `;
+    }).join('');
+
+    // Añadir botón según el número de noticias mostradas
+    const buttonHTML = numArticles === 1 ? `
+        <div class="p-4 text-center">
+            <button onclick="showMoreNews()" 
+                    class="text-amber-500 hover:text-amber-600 font-medium flex items-center mx-auto">
+                <span>Ver más noticias</span>
+                <span class="material-symbols-outlined ml-1">expand_more</span>
+            </button>
+        </div>
+    ` : `
+        <div class="p-4 text-center">
+            <button onclick="showLessNews()" 
+                    class="text-amber-500 hover:text-amber-600 font-medium flex items-center mx-auto">
+                <span>Ver menos</span>
+                <span class="material-symbols-outlined ml-1">expand_less</span>
+            </button>
+        </div>
+    `;
+
+    newsContainer.innerHTML = newsHTML + buttonHTML;
+}
+
+// Función para mostrar más noticias (accesible globalmente)
+window.showMoreNews = function() {
+    if (window.newsArticles) {
+        renderNews(window.newsArticles, 3); // Mostrar 3 noticias
+    }
+};
+
+// Función para mostrar menos noticias (accesible globalmente)
+window.showLessNews = function() {
+    if (window.newsArticles) {
+        renderNews(window.newsArticles, 1); // Mostrar solo 1 noticia
+    }
+};
 
 // Actualizar la hora local basada en la zona horaria de la ubicación
 function updateLocalTime(timezoneOffset) {
@@ -1001,6 +920,11 @@ function updateWeatherUI(data) {
         
         // Actualizar el pie de página con la hora de actualización
         updateFooter();
+        
+        // Actualizar el mapa geológico con las nuevas coordenadas
+        if (data.coord) {
+            updateGeologicalMap(data.coord.lat, data.coord.lon);
+        }
     } catch (error) {
         console.error('Error al actualizar la interfaz:', error);
     }
@@ -1029,141 +953,78 @@ function updateFooter() {
 }
 
 // Actualizar información de amanecer y atardecer
-function updateSunriseSunset(sunriseTimestamp, sunsetTimestamp, timezoneOffset) {
-    // Convertir timestamps a hora local
-    const sunriseDate = new Date((sunriseTimestamp + timezoneOffset) * 1000);
-    const sunsetDate = new Date((sunsetTimestamp + timezoneOffset) * 1000);
+function updateSunriseSunset(sunrise, sunset) {
+    const sunriseTime = new Date(sunrise * 1000);
+    const sunsetTime = new Date(sunset * 1000);
     
-    // Formatear las horas para mostrar
-    const sunriseTime = sunriseDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-    const sunsetTime = sunsetDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    // Convertir a hora local
+    const sunriseLocal = sunriseTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const sunsetLocal = sunsetTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     
-    // Actualizar los elementos de texto
-    const sunriseElement = document.querySelector('div.flex.items-center:first-child p.font-bold');
-    const sunsetElement = document.querySelector('div.flex.items-center:last-child p.font-bold');
+    // Actualizar textos
+    document.querySelector('[data-sunrise]').textContent = sunriseLocal;
+    document.querySelector('[data-sunset]').textContent = sunsetLocal;
     
-    if (sunriseElement) sunriseElement.textContent = sunriseTime;
-    if (sunsetElement) sunsetElement.textContent = sunsetTime;
-    
-    // Limpiar cualquier intervalo anterior
-    if (window.sunProgressInterval) {
-        clearInterval(window.sunProgressInterval);
-    }
+    // Calcular duración del día
+    const dayDuration = sunsetTime - sunriseTime;
+    const hours = Math.floor(dayDuration / (1000 * 60 * 60));
+    const minutes = Math.floor((dayDuration % (1000 * 60 * 60)) / (1000 * 60));
+    document.querySelector('[data-daylight]').textContent = `${hours} horas ${minutes} minutos de luz solar`;
     
     function updateProgressBar() {
         const now = new Date();
         const currentTime = now.getTime();
+        const sunriseMs = sunriseTime.getTime();
+        const sunsetMs = sunsetTime.getTime();
         
-        // Obtener las horas de referencia para el día
-        const dayStart = new Date(sunriseDate);
-        dayStart.setHours(0, 0, 0, 0);
+        let progress = 0;
+        let gradient = '';
         
-        const nightEnd = new Date(sunriseDate);
-        nightEnd.setHours(sunriseDate.getHours() - 1, sunriseDate.getMinutes(), 0, 0);
-        
-        const morningStart = new Date(sunriseDate);
-        const noonTime = new Date(sunriseDate);
-        noonTime.setHours(12, 0, 0, 0);
-        
-        const afternoonStart = new Date(sunriseDate);
-        afternoonStart.setHours(14, 0, 0, 0);
-        
-        const eveningStart = new Date(sunsetDate);
-        eveningStart.setHours(sunsetDate.getHours() - 1, sunsetDate.getMinutes(), 0, 0);
-        
-        const nightStart = new Date(sunsetDate);
-        nightStart.setHours(sunsetDate.getHours() + 1, sunsetDate.getMinutes(), 0, 0);
-        
-        const dayEnd = new Date(sunsetDate);
-        dayEnd.setHours(23, 59, 59, 999);
+        if (currentTime < sunriseMs) {
+            // Antes del amanecer
+            progress = 0;
+            gradient = 'from-gray-900 via-gray-700 to-gray-900';
+        } else if (currentTime > sunsetMs) {
+            // Después del atardecer
+            progress = 100;
+            gradient = 'from-gray-900 via-gray-700 to-gray-900';
+        } else {
+            // Durante el día
+            const dayProgress = (currentTime - sunriseMs) / (sunsetMs - sunriseMs);
+            progress = dayProgress * 100;
+            
+            const hour = now.getHours();
+            if (hour < 8) {
+                // Amanecer
+                gradient = 'from-gray-700 via-amber-300 to-amber-500';
+            } else if (hour < 12) {
+                // Mañana
+                gradient = 'from-amber-300 via-amber-500 to-amber-600';
+            } else if (hour < 16) {
+                // Mediodía
+                gradient = 'from-amber-500 via-amber-600 to-amber-700';
+            } else if (hour < 18) {
+                // Tarde
+                gradient = 'from-amber-600 via-amber-700 to-amber-800';
+            } else {
+                // Atardecer
+                gradient = 'from-amber-700 via-amber-800 to-gray-900';
+            }
+        }
         
         const progressBar = document.getElementById('sun-progress');
         const sunIndicator = document.getElementById('sun-indicator');
         
-        if (!progressBar || !sunIndicator) {
-            console.warn('No se encontraron los elementos de la barra de progreso');
-            return;
-        }
-        
-        let progress = 0;
-        let gradient = '';
-        let sunColor = '';
-        
-        // Definir los colores para diferentes momentos del día
-        const colors = {
-            night: '#1a1a1a',      // Negro azulado para la noche
-            dawn: '#ff7e5f',       // Naranja rosado para el amanecer
-            morning: '#ffd700',    // Amarillo dorado para la mañana
-            noon: '#ffb300',       // Naranja brillante para el mediodía
-            afternoon: '#ff7043',  // Naranja rojizo para la tarde
-            dusk: '#b71c1c',      // Rojo oscuro para el atardecer
-            evening: '#37474f'     // Gris azulado para la noche
-        };
-        
-        // Calcular el progreso basado en los períodos del día
-        if (currentTime < sunriseDate.getTime()) {
-            // Antes del amanecer (noche a amanecer)
-            const totalNightTime = sunriseDate.getTime() - dayStart.getTime();
-            const timeFromNightStart = currentTime - dayStart.getTime();
-            progress = (timeFromNightStart / totalNightTime) * 25; // Máximo 25% antes del amanecer
-            gradient = `linear-gradient(to right, ${colors.night}, ${colors.dawn})`;
-            sunColor = colors.night;
-        } else if (currentTime < noonTime.getTime()) {
-            // Mañana (amanecer a mediodía)
-            const totalMorningTime = noonTime.getTime() - sunriseDate.getTime();
-            const timeFromSunrise = currentTime - sunriseDate.getTime();
-            progress = 25 + (timeFromSunrise / totalMorningTime) * 25;
-            gradient = `linear-gradient(to right, ${colors.dawn}, ${colors.morning})`;
-            sunColor = colors.morning;
-        } else if (currentTime < afternoonStart.getTime()) {
-            // Mediodía
-            const totalNoonTime = afternoonStart.getTime() - noonTime.getTime();
-            const timeFromNoon = currentTime - noonTime.getTime();
-            progress = 50 + (timeFromNoon / totalNoonTime) * 15;
-            gradient = `linear-gradient(to right, ${colors.morning}, ${colors.noon})`;
-            sunColor = colors.noon;
-        } else if (currentTime < eveningStart.getTime()) {
-            // Tarde
-            const totalAfternoonTime = eveningStart.getTime() - afternoonStart.getTime();
-            const timeFromAfternoon = currentTime - afternoonStart.getTime();
-            progress = 65 + (timeFromAfternoon / totalAfternoonTime) * 20;
-            gradient = `linear-gradient(to right, ${colors.noon}, ${colors.afternoon})`;
-            sunColor = colors.afternoon;
-        } else if (currentTime < sunsetDate.getTime()) {
-            // Atardecer
-            const totalEveningTime = sunsetDate.getTime() - eveningStart.getTime();
-            const timeFromEvening = currentTime - eveningStart.getTime();
-            progress = 85 + (timeFromEvening / totalEveningTime) * 15;
-            gradient = `linear-gradient(to right, ${colors.afternoon}, ${colors.dusk})`;
-            sunColor = colors.dusk;
-        } else {
-            // Noche
-            progress = 100;
-            gradient = `linear-gradient(to right, ${colors.dusk}, ${colors.night})`;
-            sunColor = colors.night;
-        }
-        
-        // Aplicar los cambios con transiciones suaves
-        progressBar.style.width = `${progress}%`;
-        progressBar.style.background = gradient;
-        sunIndicator.style.left = `${progress}%`;
-        sunIndicator.style.borderColor = sunColor;
-        
-        // Calcular la duración del día
-        const daylight = (sunsetDate.getTime() - sunriseDate.getTime()) / (1000 * 60); // Duración en minutos
-        const hours = Math.floor(daylight / 60);
-        const minutes = Math.floor(daylight % 60);
-        
-        // Actualizar el texto de la duración del día
-        const daylightText = document.querySelector('p.text-sm.text-gray-600.text-center');
-        if (daylightText) {
-            daylightText.textContent = `${hours} horas ${minutes} minutos de luz solar`;
+        if (progressBar && sunIndicator) {
+            progressBar.style.width = `${progress}%`;
+            progressBar.className = `h-full rounded-full transition-all duration-1000 bg-gradient-to-r ${gradient}`;
+            sunIndicator.style.left = `${progress}%`;
         }
     }
     
-    // Actualizar inmediatamente y configurar el intervalo
+    // Actualizar inmediatamente y cada minuto
     updateProgressBar();
-    window.sunProgressInterval = setInterval(updateProgressBar, 60000); // Actualizar cada minuto
+    setInterval(updateProgressBar, 60000);
 }
 
 // Actualizar información de calidad del aire
@@ -1785,46 +1646,68 @@ async function updateWeatherRadar(lat, lon, layer = 'precipitation_new', zoom = 
 // Cargar datos iniciales
 async function loadInitialData() {
     try {
-        // Prevenir múltiples intentos de carga iniciales
-        if (window.initialDataLoaded) {
-            console.log('Los datos iniciales ya fueron cargados, omitiendo...');
-            return;
+        if (!validateApiKeys()) {
+            return false;
         }
+
+        // Inicializar elementos de la UI
+        const searchInput = document.querySelector('input.w-full.pl-10');
+        if (searchInput) {
+            initializeAutocomplete();
+        }
+
+        // Cargar datos del clima para la ciudad por defecto
+        const defaultCity = localStorage.getItem('last_city') || 'Madrid';
+        const weatherData = await getWeatherData(defaultCity).catch(err => handleApiError(err, 'getWeatherData'));
         
-        // Definir una ciudad por defecto (Madrid)
-        const defaultCity = 'Madrid';
-        
-        // Primero cargar los datos de la ciudad por defecto
-        const weatherData = await getWeatherData(defaultCity);
         if (weatherData) {
-            // Marcar como cargado para evitar cargas duplicadas
-            window.initialDataLoaded = true;
-            
-            updateWeatherUI(weatherData);
-            
-            // Obtener datos adicionales usando coordenadas
-            const lat = weatherData.coord.lat;
-            const lon = weatherData.coord.lon;
-            
-            // Obtener pronóstico
-            const forecastData = await getForecastData(defaultCity);
-            updateHourlyForecast(forecastData);
-            update7DayForecast(forecastData);
-            
-            // Actualizar el radar meteorológico
-            updateWeatherRadar(lat, lon);
+            await updateWeatherUI(weatherData);
+            startClock();
         } else {
-            // Si no se pudieron cargar los datos, mostrar un mensaje de error
-            console.error('No se pudieron cargar los datos iniciales');
-            
-            // Mostrar mensaje de error en la UI en lugar de pantalla de carga
+            throw new Error('No se pudieron cargar los datos del clima');
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Error al cargar datos iniciales:', error);
+        return false;
+    }
+}
+
+// Función para manejar el splash screen
+function handleSplashScreen() {
+    const splashScreen = document.getElementById('splash-screen');
+    if (!splashScreen) {
+        console.warn('No se encontró el elemento splash-screen');
+        return;
+    }
+
+    const minimumLoadingTime = 1000;
+    const startTime = Date.now();
+
+    const hideSplashScreen = () => {
+        if (!splashScreen || !splashScreen.parentNode) return;
+        splashScreen.classList.add('hide');
+        setTimeout(() => splashScreen.remove(), 500);
+    };
+
+    // Cargar recursos principales
+    Promise.race([
+        loadInitialData(),
+        new Promise(resolve => setTimeout(() => resolve(false), 4000))
+    ])
+    .then(success => {
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = Math.max(0, minimumLoadingTime - elapsedTime);
+
+        if (!success) {
             const mainContainer = document.querySelector('.bg-gradient-to-r.from-amber-400');
             if (mainContainer) {
                 mainContainer.innerHTML = `
                     <div class="flex flex-col items-center justify-center p-8 text-center">
                         <span class="material-symbols-outlined text-5xl text-white mb-4">error</span>
-                        <h2 class="text-white text-xl font-bold mb-2">Error de conexión</h2>
-                        <p class="text-white/90 mb-4">No se pudo conectar con el servidor meteorológico.</p>
+                        <h2 class="text-white text-xl font-bold mb-2">Error de Inicialización</h2>
+                        <p class="text-white/90 mb-4">No se pudo cargar la aplicación correctamente.</p>
                         <button class="bg-white text-orange-500 px-4 py-2 rounded-lg shadow-md hover:bg-orange-100 transition-colors duration-300" 
                                 onclick="window.location.reload()">
                             Reintentar
@@ -1833,25 +1716,20 @@ async function loadInitialData() {
                 `;
             }
         }
-    } catch (error) {
-        console.error('Error al cargar datos iniciales:', error);
-        
-        // Mostrar mensaje de error en la UI
-        const mainContainer = document.querySelector('.bg-gradient-to-r.from-amber-400');
-        if (mainContainer) {
-            mainContainer.innerHTML = `
-                <div class="flex flex-col items-center justify-center p-8 text-center">
-                    <span class="material-symbols-outlined text-5xl text-white mb-4">error</span>
-                    <h2 class="text-white text-xl font-bold mb-2">Error de conexión</h2>
-                    <p class="text-white/90 mb-4">No se pudo conectar con el servidor meteorológico: ${error.message}</p>
-                    <button class="bg-white text-orange-500 px-4 py-2 rounded-lg shadow-md hover:bg-orange-100 transition-colors duration-300" 
-                            onclick="window.location.reload()">
-                        Reintentar
-                    </button>
-                </div>
-            `;
-        }
-    }
+
+        setTimeout(hideSplashScreen, remainingTime);
+    })
+    .catch(error => {
+        console.error('Error durante la carga:', error);
+        hideSplashScreen();
+    });
+}
+
+// Inicializar la aplicación cuando el DOM esté listo
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', handleSplashScreen);
+} else {
+    handleSplashScreen();
 }
 
 // Función para actualizar el reloj en tiempo real
@@ -1925,7 +1803,7 @@ async function searchCities(query) {
                     sort: '-population'
                 },
                 headers: {
-                    'X-RapidAPI-Key': '38cbb68abemshae8b091404cd1e0p12dad0jsn4e35bc60ac5d',
+                    'X-RapidAPI-Key': import.meta.env.VITE_RAPIDAPI_KEY,
                     'X-RapidAPI-Host': 'wft-geo-db.p.rapidapi.com'
                 },
                 timeout: 3000 // Timeout de 3 segundos
@@ -2725,3 +2603,366 @@ document.addEventListener('DOMContentLoaded', () => {
     // Cargar datos iniciales
     loadInitialData();
 }); 
+
+// Mapa Geológico
+let map = null;
+let geologicalLayer = null;
+let isGeologyVisible = true;
+
+function initializeGeologicalMap(lat, lon) {
+    if (map) {
+        map.remove();
+    }
+
+    map = L.map('geological-map').setView([lat, lon], 10);
+    
+    // Capa base de OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Capa geológica de OpenGeoscience
+    geologicalLayer = L.tileLayer('https://tiles.opengeoscience.org/geology/{z}/{x}/{y}.png', {
+        attribution: '© British Geological Survey',
+        opacity: 0.7
+    }).addTo(map);
+
+    // Ocultar el indicador de carga
+    document.getElementById('map-loading').style.display = 'none';
+}
+
+// Función para actualizar el mapa cuando se cambia la ubicación
+function updateGeologicalMap(lat, lon) {
+    if (map) {
+        map.setView([lat, lon], 10);
+    } else {
+        initializeGeologicalMap(lat, lon);
+    }
+}
+
+// Eventos de los botones del mapa
+document.getElementById('toggle-geology')?.addEventListener('click', () => {
+    if (geologicalLayer) {
+        isGeologyVisible = !isGeologyVisible;
+        if (isGeologyVisible) {
+            geologicalLayer.addTo(map);
+            document.getElementById('toggle-geology').innerHTML = 
+                '<span class="material-symbols-outlined text-sm mr-1">layers</span>Capa Geológica';
+        } else {
+            map.removeLayer(geologicalLayer);
+            document.getElementById('toggle-geology').innerHTML = 
+                '<span class="material-symbols-outlined text-sm mr-1">layers_off</span>Capa Geológica';
+        }
+    }
+});
+
+document.getElementById('fullscreen-map')?.addEventListener('click', () => {
+    const mapContainer = document.getElementById('geological-map');
+    if (mapContainer.requestFullscreen) {
+        mapContainer.requestFullscreen();
+    } else if (mapContainer.webkitRequestFullscreen) {
+        mapContainer.webkitRequestFullscreen();
+    } else if (mapContainer.msRequestFullscreen) {
+        mapContainer.msRequestFullscreen();
+    }
+});
+
+// Modificar la función updateWeather para incluir la actualización del mapa
+async function updateWeather(city) {
+    try {
+        // ... existing weather update code ...
+        
+        // Actualizar el mapa geológico con las nuevas coordenadas
+        if (data.coord) {
+            updateGeologicalMap(data.coord.lat, data.coord.lon);
+        }
+        
+        // ... rest of the existing code ...
+    } catch (error) {
+        console.error('Error al actualizar el clima:', error);
+    }
+} 
+
+// ... existing code ...
+
+// Función para mostrar sugerencias
+function showSuggestions(suggestions) {
+    const suggestionsContainer = document.getElementById('suggestions');
+    if (!suggestionsContainer) return;
+
+    if (suggestions.length === 0) {
+        suggestionsContainer.innerHTML = '<div class="no-results">No se encontraron resultados</div>';
+        suggestionsContainer.classList.remove('hidden');
+        return;
+    }
+
+    suggestionsContainer.innerHTML = suggestions.map((suggestion, index) => `
+        <div class="suggestion-item ${index === 0 ? 'active' : ''}" data-index="${index}">
+            <span class="material-symbols-outlined">location_on</span>
+            <div class="location-info">
+                <div class="location-name">${suggestion.name}</div>
+                <div class="location-country">${suggestion.country}</div>
+            </div>
+        </div>
+    `).join('');
+
+    suggestionsContainer.classList.remove('hidden');
+}
+
+// Función para ocultar sugerencias
+function hideSuggestions() {
+    const suggestionsContainer = document.getElementById('suggestions');
+    if (suggestionsContainer) {
+        suggestionsContainer.classList.add('hidden');
+    }
+}
+
+// Evento de búsqueda
+searchInput.addEventListener('input', async (e) => {
+    const query = e.target.value.trim();
+    if (query.length < 2) {
+        hideSuggestions();
+        return;
+    }
+
+    try {
+        const response = await axios.get(`${GEO_URL}/direct?q=${query}&limit=5&appid=${API_KEY}`);
+        showSuggestions(response.data);
+    } catch (error) {
+        console.error('Error al buscar ubicaciones:', error);
+        hideSuggestions();
+    }
+});
+
+// Evento para cerrar sugerencias al hacer clic fuera
+document.addEventListener('click', (e) => {
+    const suggestionsContainer = document.getElementById('suggestions');
+    const searchInput = document.querySelector('input[type="text"]');
+    
+    if (!suggestionsContainer?.contains(e.target) && e.target !== searchInput) {
+        hideSuggestions();
+    }
+});
+
+// Evento para seleccionar una sugerencia
+document.getElementById('suggestions')?.addEventListener('click', (e) => {
+    const suggestionItem = e.target.closest('.suggestion-item');
+    if (suggestionItem) {
+        const index = suggestionItem.dataset.index;
+        const suggestions = Array.from(document.querySelectorAll('.suggestion-item'))
+            .map(item => ({
+                name: item.querySelector('.location-name').textContent,
+                country: item.querySelector('.location-country').textContent
+            }));
+        
+        if (suggestions[index]) {
+            updateWeather(suggestions[index].name);
+            hideSuggestions();
+        }
+    }
+});
+
+// Evento para navegar con el teclado
+document.querySelector('input[type="text"]').addEventListener('keydown', (e) => {
+    const suggestions = document.querySelectorAll('.suggestion-item');
+    const activeSuggestion = document.querySelector('.suggestion-item.active');
+    
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const currentIndex = activeSuggestion ? parseInt(activeSuggestion.dataset.index) : -1;
+        let newIndex;
+        
+        if (e.key === 'ArrowDown') {
+            newIndex = currentIndex < suggestions.length - 1 ? currentIndex + 1 : 0;
+        } else {
+            newIndex = currentIndex > 0 ? currentIndex - 1 : suggestions.length - 1;
+        }
+        
+        suggestions.forEach(item => item.classList.remove('active'));
+        suggestions[newIndex].classList.add('active');
+    } else if (e.key === 'Enter' && activeSuggestion) {
+        const index = activeSuggestion.dataset.index;
+        const suggestions = Array.from(document.querySelectorAll('.suggestion-item'))
+            .map(item => ({
+                name: item.querySelector('.location-name').textContent,
+                country: item.querySelector('.location-country').textContent
+            }));
+        
+        if (suggestions[index]) {
+            updateWeather(suggestions[index].name);
+            hideSuggestions();
+        }
+    } else if (e.key === 'Escape') {
+        hideSuggestions();
+    }
+});
+
+// ... existing code ...
+
+// Registro del Service Worker y funcionalidades PWA
+async function registerPWA() {
+  if ('serviceWorker' in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.register('/service-worker.js', {
+        scope: config.serviceWorker.scope
+      });
+      console.log('Service Worker registrado:', registration);
+
+      // Registrar para sincronización en segundo plano
+      if ('sync' in registration) {
+        try {
+          await registration.sync.register('sync-weather');
+          console.log('Sincronización en segundo plano registrada');
+        } catch (err) {
+          console.log('Error al registrar sync:', err);
+        }
+      }
+
+      // Configurar notificaciones push
+      if ('Notification' in window) {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          try {
+            const subscription = await registration.pushManager.subscribe({
+              ...config.pushNotifications.defaultOptions,
+              applicationServerKey: urlBase64ToUint8Array(config.vapid.publicKey)
+            });
+            
+            // Guardar la suscripción en localStorage
+            localStorage.setItem('push-subscription', JSON.stringify(subscription));
+            console.log('Push subscription:', subscription);
+
+            // Enviar la suscripción al servidor (cuando lo implementemos)
+            // await sendSubscriptionToServer(subscription);
+          } catch (error) {
+            console.error('Error al suscribirse a notificaciones push:', error);
+          }
+        }
+      }
+
+      // Configurar actualización periódica del Service Worker
+      setInterval(() => {
+        registration.update();
+      }, config.serviceWorker.updateInterval);
+
+    } catch (error) {
+      console.error('Error al registrar el Service Worker:', error);
+    }
+  }
+}
+
+// Función auxiliar para convertir clave VAPID
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+// Manejar la instalación
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredPrompt = event;
+  
+  // Mostrar botón de instalación personalizado
+  const installButton = document.createElement('button');
+  installButton.textContent = 'Instalar WeatheRyn';
+  installButton.classList.add(
+    'install-button',
+    'fixed',
+    'bottom-4',
+    'right-4',
+    'bg-primary-500',
+    'text-white',
+    'px-4',
+    'py-2',
+    'rounded-lg',
+    'shadow-lg',
+    'z-50',
+    'flex',
+    'items-center',
+    'gap-2'
+  );
+  
+  // Añadir icono al botón
+  const icon = document.createElement('span');
+  icon.classList.add('material-symbols-outlined');
+  icon.textContent = 'download';
+  installButton.prepend(icon);
+  
+  installButton.addEventListener('click', async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`Usuario ${outcome === 'accepted' ? 'aceptó' : 'rechazó'} la instalación`);
+      deferredPrompt = null;
+      installButton.remove();
+    }
+  });
+
+  document.body.appendChild(installButton);
+});
+
+// Detectar si la app fue instalada
+window.addEventListener('appinstalled', (event) => {
+  console.log('WeatheRyn se ha instalado correctamente');
+  // Actualizar la interfaz si es necesario
+  if (document.querySelector('.install-button')) {
+    document.querySelector('.install-button').remove();
+  }
+});
+
+// Inicializar la PWA después de cargar el contenido
+document.addEventListener('DOMContentLoaded', () => {
+  registerPWA();
+});
+
+// ... existing code ...
+
+// Función para manejar errores de API
+function handleApiError(error, context) {
+    console.warn(`Error en ${context}:`, error);
+    return null;
+}
+
+// Función para verificar API keys
+function validateApiKeys() {
+    const keys = {
+        openweather: localStorage.getItem('openweather_api_key'),
+        gnews: localStorage.getItem('gnews_api_key')
+    };
+    
+    let missingKeys = [];
+    if (!keys.openweather) missingKeys.push('OpenWeather');
+    if (!keys.gnews) missingKeys.push('GNews');
+    
+    if (missingKeys.length > 0) {
+        const container = document.querySelector('.bg-gradient-to-r.from-amber-400');
+        if (container) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-8 text-center">
+                    <span class="material-symbols-outlined text-5xl text-white mb-4">warning</span>
+                    <h2 class="text-white text-xl font-bold mb-2">Configuración Incompleta</h2>
+                    <p class="text-white/90 mb-4">Se requieren las siguientes API keys: ${missingKeys.join(', ')}</p>
+                    <button class="bg-white text-orange-500 px-4 py-2 rounded-lg shadow-md hover:bg-orange-100 transition-colors duration-300" 
+                            onclick="window.location.href='config.html'">
+                        Configurar API Keys
+                    </button>
+                </div>
+            `;
+            return false;
+        }
+    }
+    return true;
+}
+
+// ... resto del código existente ...

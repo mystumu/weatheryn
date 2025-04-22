@@ -1,42 +1,72 @@
-# WeatheRyn - Aplicación del Clima
+# WeatheRyn
 
-Una moderna aplicación web para consultar el pronóstico del tiempo en cualquier ciudad del mundo.
+Aplicación meteorológica precisa y fácil de usar, con pronóstico del tiempo, noticias meteorológicas y más.
 
 ## Características
 
-- Búsqueda de clima por nombre de ciudad
-- Geolocalización para obtener el clima de tu ubicación actual
-- Pronóstico por horas
-- Visualización de datos en tiempo real (temperatura, humedad, presión, viento)
-- Interfaz moderna y responsive
+- 🌤️ Pronóstico del tiempo actual y por horas
+- 🌡️ Información detallada de temperatura, humedad, viento y más
+- 🗺️ Mapa geológico interactivo
+- 📰 Noticias meteorológicas actualizadas
+- 🌅 Seguimiento de amanecer y atardecer
+- 🌍 Soporte para múltiples ciudades
+- 📱 Diseño responsivo y PWA
 
-## Tecnologías utilizadas
+## Requisitos
 
-- JavaScript (ES6+)
-- Axios para peticiones HTTP
-- Tailwind CSS para estilos
-- Vite como bundler y servidor de desarrollo
-- API de OpenWeatherMap
+- Node.js 18 o superior
+- API key de OpenWeather
+- API key de GNews
 
-## Cómo iniciar
+## Instalación
 
-1. Clona este repositorio
-2. Instala las dependencias con:
-   ```
-   npm install
-   ```
-3. Inicia el servidor de desarrollo:
-   ```
-   npm start
-   ```
-4. Abre http://localhost:3000 en tu navegador
+1. Clona el repositorio:
+```bash
+git clone https://github.com/tuusuario/weatheryn.git
+cd weatheryn
+```
 
-## Uso
+2. Instala las dependencias:
+```bash
+npm install
+```
 
-- Escribe el nombre de una ciudad en el campo de búsqueda y presiona Enter
-- Haz clic en "Current Location" para obtener el clima de tu ubicación actual
-- Explora el pronóstico por horas y otros datos meteorológicos
+3. Configura las API keys:
+   - Abre la aplicación en el navegador
+   - Ve a la página de configuración
+   - Ingresa tus API keys de OpenWeather y GNews
 
-## API Key
+## Desarrollo
 
-Esta aplicación utiliza una API key gratuita de OpenWeatherMap. 
+Para iniciar el servidor de desarrollo:
+```bash
+npm run dev
+```
+
+## Construcción
+
+Para construir la aplicación para producción:
+```bash
+npm run build
+```
+
+Los archivos de la build se generarán en el directorio `dist`.
+
+## Vista previa de producción
+
+Para previsualizar la build de producción:
+```bash
+npm run preview
+```
+
+## Tecnologías
+
+- Vite
+- Tailwind CSS
+- Leaflet
+- Axios
+- PWA
+
+## Licencia
+
+MIT 

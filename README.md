@@ -22,7 +22,7 @@ Aplicación meteorológica precisa y fácil de usar, con pronóstico del tiempo,
 
 1. Clona el repositorio:
 ```bash
-git clone https://github.com/tuusuario/weatheryn.git
+git clone https://github.com/mystumu/weatheryn.git
 cd weatheryn
 ```
 

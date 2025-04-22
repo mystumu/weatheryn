@@ -108,8 +108,8 @@
                 const openweatherKey = document.getElementById('openweather_key').value.trim();
                 const gnewsKey = document.getElementById('gnews_key').value.trim();
 
-                if (!openweatherKey || !gnewsKey) {
-                    alert('Por favor ingresa ambas API keys');
+                if (!openweatherKey) {
+                    alert('Por favor ingresa la API key de OpenWeather');
                     return;
                 }
 
@@ -120,9 +120,14 @@
                     return;
                 }
 
+                // Guardar las keys
                 localStorage.setItem('openweather_api_key', openweatherKey);
-                localStorage.setItem('gnews_api_key', gnewsKey);
+                if (gnewsKey) {
+                    localStorage.setItem('gnews_api_key', gnewsKey);
+                }
 
+                // Mostrar mensaje de éxito y redirigir
+                alert('Configuración guardada correctamente');
                 window.location.href = 'index.html';
             });
         });

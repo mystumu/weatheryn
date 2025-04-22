@@ -3,12 +3,15 @@ import * as L from 'leaflet';
 import { config } from './config.js';
 
 // Configuración de las API keys y URLs base
-const API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY;
-const BASE_URL = import.meta.env.VITE_OPENWEATHER_BASE_URL;
-const GEO_URL = import.meta.env.VITE_OPENWEATHER_GEO_URL;
+const API_KEY = localStorage.getItem('openweather_api_key');
+const GNEWS_API_KEY = localStorage.getItem('gnews_api_key');
+const BASE_URL = 'https://api.openweathermap.org/data/2.5';
+const GEO_URL = 'https://api.openweathermap.org/geo/1.0';
 
 if (!API_KEY) {
-    console.error('Error: No se ha encontrado la clave API de OpenWeather. Por favor, configura VITE_OPENWEATHER_API_KEY en el archivo .env');
+    console.error('Error: No se ha encontrado la clave API de OpenWeather.');
+    // Redirigir a la página de configuración si no hay API key
+    window.location.href = 'config.html';
 }
 
 // Sistema de caché para datos meteorológicos
@@ -925,6 +928,23 @@ function updateWeatherUI(data) {
         if (data.coord) {
             updateGeologicalMap(data.coord.lat, data.coord.lon);
         }
+
+        // Añadir botón de configuración
+        const weatherCard = document.querySelector('.weather-card');
+        if (weatherCard) {
+            const configButton = document.createElement('button');
+            configButton.className = 'absolute top-4 right-4 p-2 text-gray-600 hover:text-gray-800 transition-colors duration-300';
+            configButton.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            `;
+            configButton.addEventListener('click', () => {
+                window.location.href = 'config.html';
+            });
+            weatherCard.appendChild(configButton);
+        }
     } catch (error) {
         console.error('Error al actualizar la interfaz:', error);
     }
@@ -932,32 +952,46 @@ function updateWeatherUI(data) {
 
 // Actualizar el pie de página con la fecha y hora actual
 function updateFooter() {
-    const now = new Date();
-    const options = { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    };
-    
-    // Utilizar zona horaria local para el pie de página
-    const formattedDate = now.toLocaleDateString('es-ES', options);
-    
-    const footerTimestamp = document.querySelector('footer p');
-    if (footerTimestamp) {
-        footerTimestamp.textContent = `Datos meteorológicos proporcionados por OpenWeather • Última actualización: ${formattedDate}`;
+    const footer = document.querySelector('footer');
+    if (footer) {
+        footer.innerHTML = `
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+                    <div class="text-sm text-gray-600">
+                        © ${new Date().getFullYear()} WeatheRyn. Todos los derechos reservados.
+                    </div>
+                    <div class="flex space-x-6">
+                        <a href="privacy.html" class="text-sm text-gray-600 hover:text-gray-800 transition-colors">
+                            Privacidad
+                        </a>
+                        <a href="terms.html" class="text-sm text-gray-600 hover:text-gray-800 transition-colors">
+                            Términos
+                        </a>
+                        <a href="config.html" class="text-sm text-gray-600 hover:text-gray-800 transition-colors flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            Configuración
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
     }
-    
-    console.log('Pie de página actualizado con fecha actual:', formattedDate);
 }
 
 // Actualizar información de amanecer y atardecer
-function updateSunriseSunset(sunrise, sunset) {
-    const sunriseTime = new Date(sunrise * 1000);
-    const sunsetTime = new Date(sunset * 1000);
+function updateSunriseSunset(sunrise, sunset, timezone = 0) {
+    // Convertir timestamps a fechas locales considerando el huso horario
+    const localOffset = new Date().getTimezoneOffset() * 60;
+    const cityOffset = timezone || 0;
+    const offsetDiff = cityOffset + localOffset;
+
+    const sunriseTime = new Date((sunrise + offsetDiff) * 1000);
+    const sunsetTime = new Date((sunset + offsetDiff) * 1000);
     
-    // Convertir a hora local
+    // Convertir a hora local de la ciudad
     const sunriseLocal = sunriseTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     const sunsetLocal = sunsetTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     
@@ -971,60 +1005,108 @@ function updateSunriseSunset(sunrise, sunset) {
     const minutes = Math.floor((dayDuration % (1000 * 60 * 60)) / (1000 * 60));
     document.querySelector('[data-daylight]').textContent = `${hours} horas ${minutes} minutos de luz solar`;
     
+    // Limpiar cualquier intervalo anterior
+    if (window.sunProgressInterval) {
+        clearInterval(window.sunProgressInterval);
+    }
+    
     function updateProgressBar() {
+        // Obtener la hora actual en la zona horaria de la ciudad
         const now = new Date();
-        const currentTime = now.getTime();
-        const sunriseMs = sunriseTime.getTime();
-        const sunsetMs = sunsetTime.getTime();
+        const cityTime = new Date(now.getTime() + (offsetDiff * 1000));
         
-        let progress = 0;
+        const minutesSinceMidnight = cityTime.getHours() * 60 + cityTime.getMinutes();
+        const sunriseMinutes = sunriseTime.getHours() * 60 + sunriseTime.getMinutes();
+        const sunsetMinutes = sunsetTime.getHours() * 60 + sunsetTime.getMinutes();
+        
+        // Calcular el progreso basado en las 24 horas (1440 minutos)
+        const progress = (minutesSinceMidnight / 1440) * 100;
+        
+        // Calcular las posiciones del amanecer y atardecer en la barra
+        const sunrisePosition = (sunriseMinutes / 1440) * 100;
+        const sunsetPosition = (sunsetMinutes / 1440) * 100;
+        
         let gradient = '';
         
-        if (currentTime < sunriseMs) {
-            // Antes del amanecer
-            progress = 0;
-            gradient = 'from-gray-900 via-gray-700 to-gray-900';
-        } else if (currentTime > sunsetMs) {
-            // Después del atardecer
-            progress = 100;
-            gradient = 'from-gray-900 via-gray-700 to-gray-900';
+        // Determinar el color basado en la hora del día
+        if (minutesSinceMidnight < sunriseMinutes) {
+            // Noche antes del amanecer (00:00 - amanecer)
+            gradient = 'from-gray-900 via-gray-800 to-gray-700';
+        } else if (minutesSinceMidnight > sunsetMinutes) {
+            // Noche después del atardecer (atardecer - 23:59)
+            gradient = 'from-gray-700 via-gray-800 to-gray-900';
         } else {
-            // Durante el día
-            const dayProgress = (currentTime - sunriseMs) / (sunsetMs - sunriseMs);
-            progress = dayProgress * 100;
+            // Durante el día (amanecer - atardecer)
+            const dayProgress = (minutesSinceMidnight - sunriseMinutes) / (sunsetMinutes - sunriseMinutes);
             
-            const hour = now.getHours();
-            if (hour < 8) {
-                // Amanecer
-                gradient = 'from-gray-700 via-amber-300 to-amber-500';
-            } else if (hour < 12) {
-                // Mañana
-                gradient = 'from-amber-300 via-amber-500 to-amber-600';
-            } else if (hour < 16) {
-                // Mediodía
-                gradient = 'from-amber-500 via-amber-600 to-amber-700';
-            } else if (hour < 18) {
-                // Tarde
-                gradient = 'from-amber-600 via-amber-700 to-amber-800';
+            if (dayProgress < 0.25) {
+                gradient = 'from-gray-700 via-amber-300 to-amber-400';
+            } else if (dayProgress < 0.5) {
+                gradient = 'from-amber-300 via-amber-400 to-amber-500';
+            } else if (dayProgress < 0.75) {
+                gradient = 'from-amber-400 via-amber-500 to-amber-600';
             } else {
-                // Atardecer
-                gradient = 'from-amber-700 via-amber-800 to-gray-900';
+                gradient = 'from-amber-500 via-amber-600 to-amber-700';
             }
         }
         
         const progressBar = document.getElementById('sun-progress');
         const sunIndicator = document.getElementById('sun-indicator');
+        const container = progressBar?.parentElement;
         
-        if (progressBar && sunIndicator) {
+        if (progressBar && sunIndicator && container) {
+            // Actualizar la barra de progreso
             progressBar.style.width = `${progress}%`;
             progressBar.className = `h-full rounded-full transition-all duration-1000 bg-gradient-to-r ${gradient}`;
+            
+            // Actualizar el indicador del sol/luna
             sunIndicator.style.left = `${progress}%`;
+            sunIndicator.innerHTML = minutesSinceMidnight < sunriseMinutes || minutesSinceMidnight > sunsetMinutes ? '🌙' : '☀️';
+            
+            // Añadir marcadores de amanecer y atardecer si no existen
+            const existingSunriseMarker = container.querySelector('.sunrise-marker');
+            const existingSunsetMarker = container.querySelector('.sunset-marker');
+            
+            if (existingSunriseMarker) {
+                existingSunriseMarker.style.left = `${sunrisePosition}%`;
+                existingSunriseMarker.title = `Amanecer: ${sunriseLocal}`;
+            } else {
+                const sunriseMarker = document.createElement('div');
+                sunriseMarker.className = 'sunrise-marker absolute w-0.5 h-3 bg-amber-400 transform -translate-y-1';
+                sunriseMarker.style.left = `${sunrisePosition}%`;
+                sunriseMarker.title = `Amanecer: ${sunriseLocal}`;
+                container.appendChild(sunriseMarker);
+            }
+            
+            if (existingSunsetMarker) {
+                existingSunsetMarker.style.left = `${sunsetPosition}%`;
+                existingSunsetMarker.title = `Atardecer: ${sunsetLocal}`;
+            } else {
+                const sunsetMarker = document.createElement('div');
+                sunsetMarker.className = 'sunset-marker absolute w-0.5 h-3 bg-amber-600 transform -translate-y-1';
+                sunsetMarker.style.left = `${sunsetPosition}%`;
+                sunsetMarker.title = `Atardecer: ${sunsetLocal}`;
+                container.appendChild(sunsetMarker);
+            }
+            
+            // Añadir hora actual si no existe
+            const timeDisplay = container.querySelector('.time-display') || (() => {
+                const div = document.createElement('div');
+                div.className = 'time-display absolute -top-6 transform -translate-x-1/2 text-xs text-gray-600';
+                container.appendChild(div);
+                return div;
+            })();
+            
+            // Actualizar la hora actual en la zona horaria de la ciudad
+            const currentTime = cityTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+            timeDisplay.textContent = currentTime;
+            timeDisplay.style.left = `${progress}%`;
         }
     }
     
-    // Actualizar inmediatamente y cada minuto
+    // Actualizar cada minuto
     updateProgressBar();
-    setInterval(updateProgressBar, 60000);
+    window.sunProgressInterval = setInterval(updateProgressBar, 60000);
 }
 
 // Actualizar información de calidad del aire

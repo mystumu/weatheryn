@@ -69,4 +69,4 @@ npm run preview
 
 ## Licencia
 
-MIT 
+Apache 2.0 
